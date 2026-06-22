@@ -2,6 +2,7 @@
 backend/bin/
 backend/obj/
 backend/samples.zip
+backend/.env
 *.user
 *.suo
 

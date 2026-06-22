@@ -98,3 +98,33 @@ export async function uploadTerraform(file: File): Promise<unknown> {
   if (!response.ok) throw new Error(`Upload error: ${response.status}`)
   return response.json()
 }
+
+export interface SelfHealingResult {
+  success: boolean
+  message: string
+  anomalyId: number | null
+  incidentId: number | null
+  recoveryActionId: number | null
+  aiAnalysis: {
+    rootCause: string
+    recommendedAction: string
+    actionType: string
+    severity: string
+  } | null
+}
+
+export function triggerSelfHealing(serviceId: number): Promise<SelfHealingResult> {
+  return fetch(`/api/self-healing/trigger/${serviceId}`, { method: 'POST' })
+    .then(r => {
+      if (!r.ok) throw new Error(`Self-healing error: ${r.status}`)
+      return r.json() as Promise<SelfHealingResult>
+    })
+}
+
+export function triggerSelfHealingFromAnomaly(anomalyId: number): Promise<SelfHealingResult> {
+  return fetch(`/api/self-healing/trigger/anomaly/${anomalyId}`, { method: 'POST' })
+    .then(r => {
+      if (!r.ok) throw new Error(`Self-healing error: ${r.status}`)
+      return r.json() as Promise<SelfHealingResult>
+    })
+}

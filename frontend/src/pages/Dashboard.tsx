@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import {
   Server,
   ShieldCheck,
@@ -6,6 +6,8 @@ import {
   CheckCircle2,
   Activity,
   Zap,
+  RefreshCw,
+  Sparkles,
 } from 'lucide-react'
 import { StatCard } from '../components/StatCard'
 import { StatusBadge } from '../components/StatusBadge'
@@ -13,9 +15,11 @@ import {
   fetchServices,
   fetchActiveIncidents,
   fetchAnomalies,
+  triggerSelfHealingFromAnomaly,
   type CloudService,
   type Incident,
   type Anomaly,
+  type SelfHealingResult,
 } from '../api/client'
 import './Dashboard.css'
 
@@ -24,21 +28,40 @@ export function Dashboard() {
   const [incidents, setIncidents] = useState<Incident[]>([])
   const [anomalies, setAnomalies] = useState<Anomaly[]>([])
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
+  const [healingId, setHealingId] = useState<number | null>(null)
+  const [healResult, setHealResult] = useState<SelfHealingResult | null>(null)
 
-  useEffect(() => {
-    async function load() {
-      const [svc, inc, anom] = await Promise.allSettled([
-        fetchServices(),
-        fetchActiveIncidents(),
-        fetchAnomalies(),
-      ])
-      if (svc.status === 'fulfilled') setServices(svc.value)
-      if (inc.status === 'fulfilled') setIncidents(inc.value)
-      if (anom.status === 'fulfilled') setAnomalies(anom.value)
-      setLoading(false)
-    }
-    load()
+  const load = useCallback(async (showRefresh = false) => {
+    if (showRefresh) setRefreshing(true)
+    else setLoading(true)
+
+    const [svc, inc, anom] = await Promise.allSettled([
+      fetchServices(),
+      fetchActiveIncidents(),
+      fetchAnomalies(),
+    ])
+    if (svc.status === 'fulfilled') setServices(svc.value)
+    if (inc.status === 'fulfilled') setIncidents(inc.value)
+    if (anom.status === 'fulfilled') setAnomalies(anom.value)
+    setLoading(false)
+    setRefreshing(false)
   }, [])
+
+  useEffect(() => { load() }, [load])
+
+  const handleAutoHeal = async (anomalyId: number) => {
+    setHealingId(anomalyId)
+    setHealResult(null)
+    try {
+      const result = await triggerSelfHealingFromAnomaly(anomalyId)
+      setHealResult(result)
+      await load(true)
+    } catch {
+      setHealResult({ success: false, message: 'Self-healing failed', anomalyId: null, incidentId: null, recoveryActionId: null, aiAnalysis: null })
+    }
+    setHealingId(null)
+  }
 
   const healthyCount = services.filter((s) => s.status === 'Healthy').length
   const healthyPercent = services.length > 0
@@ -56,35 +79,42 @@ export function Dashboard() {
           <h1>Operations Overview</h1>
           <p>Real-time cloud health, anomaly detection, and automated remediation</p>
         </div>
-        <StatusBadge status="Operational" />
+        <div className="header-actions">
+          <button
+            className="btn-icon"
+            onClick={() => load(true)}
+            disabled={refreshing}
+            title="Refresh data"
+          >
+            <RefreshCw size={16} className={refreshing ? 'spinner' : ''} />
+          </button>
+          <StatusBadge status="Operational" />
+        </div>
       </header>
 
+      {healResult && (
+        <div className={`toast toast--${healResult.success ? 'success' : 'error'}`}>
+          <CheckCircle2 size={16} />
+          <div className="toast-content">
+            <strong>{healResult.success ? 'Self-Healing Complete' : 'Self-Healing Failed'}</strong>
+            <span>{healResult.message}</span>
+            {healResult.aiAnalysis && (
+              <span className="toast-detail">
+                Action: {healResult.aiAnalysis.actionType} · {healResult.aiAnalysis.rootCause}
+              </span>
+            )}
+          </div>
+          <button className="toast-close" onClick={() => setHealResult(null)}>
+            <Zap size={14} />
+          </button>
+        </div>
+      )}
+
       <section className="stats-grid">
-        <StatCard
-          icon={Server}
-          label="Total Services"
-          value={services.length}
-          variant="default"
-        />
-        <StatCard
-          icon={ShieldCheck}
-          label="Healthy Services"
-          value={healthyCount}
-          subtext={`${healthyPercent}%`}
-          variant="green"
-        />
-        <StatCard
-          icon={AlertTriangle}
-          label="Active Incidents"
-          value={incidents.length}
-          variant="red"
-        />
-        <StatCard
-          icon={CheckCircle2}
-          label="Anomalies Detected"
-          value={anomalies.length}
-          variant="yellow"
-        />
+        <StatCard icon={Server} label="Total Services" value={services.length} variant="default" />
+        <StatCard icon={ShieldCheck} label="Healthy Services" value={healthyCount} subtext={`${healthyPercent}%`} variant="green" />
+        <StatCard icon={AlertTriangle} label="Active Incidents" value={incidents.length} variant="red" />
+        <StatCard icon={CheckCircle2} label="Anomalies Detected" value={anomalies.length} variant="yellow" />
       </section>
 
       <div className="dashboard-grid">
@@ -145,8 +175,12 @@ export function Dashboard() {
 
       {anomalies.length > 0 && (
         <section className="card">
-          <h2>Latest AI Analysis</h2>
-          <p className="card-subtitle">Recent anomaly evaluations</p>
+          <div className="card-header-row">
+            <div>
+              <h2>Latest AI Analysis</h2>
+              <p className="card-subtitle">Recent anomaly evaluations</p>
+            </div>
+          </div>
           <div className="anomalies-preview">
             {anomalies.slice(0, 3).map((a) => (
               <div className="anomaly-card" key={a.id}>
@@ -159,14 +193,22 @@ export function Dashboard() {
                   <div className="anomaly-confidence">
                     <span>AI Confidence</span>
                     <div className="confidence-bar">
-                      <div
-                        className="confidence-fill"
-                        style={{ width: `${a.aiConfidence}%` }}
-                      />
+                      <div className="confidence-fill" style={{ width: `${a.aiConfidence}%` }} />
                     </div>
                     <span className="confidence-value">{a.aiConfidence}%</span>
                   </div>
                 )}
+                <button
+                  className="btn-heal"
+                  onClick={() => handleAutoHeal(a.id)}
+                  disabled={healingId !== null}
+                >
+                  {healingId === a.id ? (
+                    <><RefreshCw size={13} className="spinner" /> Healing...</>
+                  ) : (
+                    <><Sparkles size={13} /> Trigger Auto-Heal</>
+                  )}
+                </button>
               </div>
             ))}
           </div>

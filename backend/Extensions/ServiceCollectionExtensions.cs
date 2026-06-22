@@ -1,5 +1,6 @@
 using CloudGuard.Api.Repositories;
 using CloudGuard.Api.Repositories.Interfaces;
+using CloudGuard.Api.Services.AI;
 using CloudGuard.Api.Services.Anomalies;
 using CloudGuard.Api.Services.CloudServices;
 using CloudGuard.Api.Services.Incidents;
@@ -40,6 +41,12 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IIncidentService, IncidentService>();
         services.AddScoped<IRecoveryActionService, RecoveryActionService>();
         services.AddScoped<IResourceService, ResourceService>();
+
+        // AI & Self-Healing
+        services.AddHttpClient("OpenAI");
+        services.AddScoped<IAiAnalysisService, AiAnalysisService>();
+        services.AddScoped<ISelfHealingOrchestrator, SelfHealingOrchestrator>();
+        services.AddHostedService<AnomalyDetectionEngine>();
 
         return services;
     }

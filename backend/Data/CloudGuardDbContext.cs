@@ -96,7 +96,7 @@ public class CloudGuardDbContext(DbContextOptions<CloudGuardDbContext> options) 
             entity.Property(e => e.IncidentId).HasColumnName("incident_id");
             entity.Property(e => e.ActionType).HasColumnName("action_type").HasMaxLength(100);
             entity.Property(e => e.ActionStatus).HasColumnName("action_status").HasMaxLength(30).HasDefaultValue("Pending");
-            entity.Property(e => e.Description).HasColumnName("description");
+            entity.Property(e => e.Description).HasColumnName("details");
             entity.Property(e => e.ExecutedAt).HasColumnName("executed_at").HasDefaultValueSql("CURRENT_TIMESTAMP");
 
             entity.HasOne(e => e.Incident)

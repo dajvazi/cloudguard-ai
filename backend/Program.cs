@@ -1,6 +1,10 @@
 using CloudGuard.Api.Data;
 using CloudGuard.Api.Extensions;
+using DotNetEnv;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
+
+Env.Load();
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -11,7 +15,8 @@ builder.Services.AddSwaggerGen(options =>
     options.SwaggerDoc("v1", new() { Title = "CloudGuard API", Version = "v1" });
 });
 builder.Services.AddDbContext<CloudGuardDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("CloudGuard")));
+    options.UseNpgsql(builder.Configuration.GetConnectionString("CloudGuard"))
+           .ConfigureWarnings(w => w.Ignore(RelationalEventId.PendingModelChangesWarning)));
 builder.Services.AddApplicationServices();
 builder.Services.AddCors(options =>
 {
