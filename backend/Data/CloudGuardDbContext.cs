@@ -11,6 +11,7 @@ public class CloudGuardDbContext(DbContextOptions<CloudGuardDbContext> options) 
     public DbSet<Incident> Incidents => Set<Incident>();
     public DbSet<RecoveryAction> RecoveryActions => Set<RecoveryAction>();
     public DbSet<TerraformUpload> TerraformUploads => Set<TerraformUpload>();
+    public DbSet<Resource> Resources => Set<Resource>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -18,11 +19,22 @@ public class CloudGuardDbContext(DbContextOptions<CloudGuardDbContext> options) 
         {
             entity.ToTable("cloud_services");
             entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.TerraformUploadId).HasColumnName("terraform_upload_id");
             entity.Property(e => e.Name).HasColumnName("name").HasMaxLength(100).IsRequired();
-            entity.Property(e => e.Type).HasColumnName("type").HasMaxLength(50).IsRequired();
+            entity.Property(e => e.Type).HasColumnName("type").HasMaxLength(100).IsRequired();
             entity.Property(e => e.Status).HasColumnName("status").HasMaxLength(30).HasDefaultValue("Healthy");
             entity.Property(e => e.Description).HasColumnName("description");
+            entity.Property(e => e.SourceKind).HasColumnName("source_kind").HasMaxLength(20).HasDefaultValue("resource");
+            entity.Property(e => e.RawResourceType).HasColumnName("raw_resource_type").HasMaxLength(100);
+            entity.Property(e => e.SourceFile).HasColumnName("source_file").HasMaxLength(255);
+            entity.Property(e => e.ModuleSource).HasColumnName("module_source").HasMaxLength(255);
+            entity.Property(e => e.ParentModule).HasColumnName("parent_module").HasMaxLength(100);
             entity.Property(e => e.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+            entity.HasOne(e => e.TerraformUpload)
+                .WithMany(u => u.CloudServices)
+                .HasForeignKey(e => e.TerraformUploadId)
+                .OnDelete(DeleteBehavior.SetNull);
         });
 
         modelBuilder.Entity<Metric>(entity =>
@@ -101,6 +113,17 @@ public class CloudGuardDbContext(DbContextOptions<CloudGuardDbContext> options) 
             entity.Property(e => e.UploadStatus).HasColumnName("upload_status").HasMaxLength(50).HasDefaultValue("Uploaded");
             entity.Property(e => e.ServicesDetected).HasColumnName("services_detected").HasDefaultValue(0);
             entity.Property(e => e.UploadedAt).HasColumnName("uploaded_at").HasDefaultValueSql("CURRENT_TIMESTAMP");
+        });
+
+        modelBuilder.Entity<Resource>(entity =>
+        {
+            entity.ToTable("resources");
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.ResourceName).HasColumnName("resource_name").HasMaxLength(100).IsRequired();
+            entity.Property(e => e.ResourceType).HasColumnName("resource_type").HasMaxLength(100).IsRequired();
+            entity.Property(e => e.Source).HasColumnName("source").HasMaxLength(255);
+            entity.Property(e => e.Status).HasColumnName("status").HasMaxLength(30).HasDefaultValue("Discovered");
+            entity.Property(e => e.DiscoveredAt).HasColumnName("discovered_at").HasDefaultValueSql("CURRENT_TIMESTAMP");
         });
     }
 }

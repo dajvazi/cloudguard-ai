@@ -3,6 +3,7 @@ using System;
 using CloudGuard.Api.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace CloudGuard.Api.Migrations
 {
     [DbContext(typeof(CloudGuardDbContext))]
-    partial class CloudGuardDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260621124328_AddTerraformServiceMetadata")]
+    partial class AddTerraformServiceMetadata
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -285,51 +288,6 @@ namespace CloudGuard.Api.Migrations
                     b.HasIndex("IncidentId");
 
                     b.ToTable("recovery_actions", (string)null);
-                });
-
-            modelBuilder.Entity("CloudGuard.Api.Models.Resource", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasColumnName("id");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime>("DiscoveredAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("discovered_at")
-                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
-
-                    b.Property<string>("ResourceName")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("resource_name");
-
-                    b.Property<string>("ResourceType")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("resource_type");
-
-                    b.Property<string>("Source")
-                        .HasMaxLength(255)
-                        .HasColumnType("character varying(255)")
-                        .HasColumnName("source");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(30)
-                        .HasColumnType("character varying(30)")
-                        .HasDefaultValue("Discovered")
-                        .HasColumnName("status");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("resources", (string)null);
                 });
 
             modelBuilder.Entity("CloudGuard.Api.Models.TerraformUpload", b =>
