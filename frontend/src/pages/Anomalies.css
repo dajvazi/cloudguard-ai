@@ -1,0 +1,114 @@
+.anomalies-page {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.anomaly-total {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--yellow-text);
+  background: var(--yellow-bg);
+  padding: 6px 12px;
+  border-radius: var(--radius);
+}
+
+.anomalies-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 14px;
+}
+
+.anomaly-detail-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition: border-color 0.15s;
+}
+
+.anomaly-detail-card:hover {
+  border-color: var(--border-light);
+}
+
+.anomaly-detail-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.anomaly-detail-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--accent-hover);
+}
+
+.anomaly-detail-title strong {
+  font-size: 14px;
+  color: var(--text-primary);
+}
+
+.anomaly-detail-service {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.anomaly-detail-desc {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.anomaly-detail-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 6px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
+.confidence-meter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.confidence-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  min-width: 70px;
+}
+
+.confidence-track {
+  flex: 1;
+  height: 5px;
+  background: var(--border);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.confidence-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), var(--purple));
+  border-radius: 3px;
+}
+
+.confidence-pct {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent-hover);
+  min-width: 35px;
+  text-align: right;
+}
+
+.anomaly-detail-time {
+  font-size: 11px;
+  color: var(--text-muted);
+}

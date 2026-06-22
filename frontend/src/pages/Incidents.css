@@ -1,0 +1,78 @@
+.incidents-page {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.incidents-count {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--red-text);
+  background: var(--red-bg);
+  padding: 6px 12px;
+  border-radius: var(--radius);
+}
+
+.incidents-table-wrap {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow-x: auto;
+}
+
+.incidents-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.incidents-table th {
+  text-align: left;
+  padding: 12px 14px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  background: var(--bg-hover);
+  border-bottom: 1px solid var(--border);
+}
+
+.incidents-table td {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+
+.incident-row:last-child td {
+  border-bottom: none;
+}
+
+.incident-row--resolved {
+  opacity: 0.6;
+}
+
+.inc-service {
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.inc-title {
+  color: var(--text-secondary);
+}
+
+.inc-cause {
+  color: var(--text-muted);
+  font-size: 12px;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.inc-time {
+  color: var(--text-muted);
+  font-size: 12px;
+  white-space: nowrap;
+}

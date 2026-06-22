@@ -40,28 +40,61 @@ export interface Incident {
   resolvedAt: string | null
 }
 
+export interface Metric {
+  id: number
+  cloudServiceId: number
+  cloudServiceName: string
+  cpuUsage: number | null
+  memoryUsage: number | null
+  latencyMs: number | null
+  errorRate: number | null
+  recordedAt: string
+}
+
+export interface Anomaly {
+  id: number
+  cloudServiceId: number
+  cloudServiceName: string
+  anomalyType: string | null
+  severity: string | null
+  aiConfidence: number | null
+  description: string | null
+  detectedAt: string
+}
+
+export interface RecoveryAction {
+  id: number
+  incidentId: number
+  actionType: string | null
+  actionStatus: string
+  description: string | null
+  executedAt: string
+}
+
 async function getJson<T>(url: string): Promise<T> {
   const response = await fetch(url)
-
   if (!response.ok) {
     throw new Error(`API error: ${response.status}`)
   }
-
   return response.json() as Promise<T>
 }
 
-export function fetchStatus() {
-  return getJson<ApiStatus>('/api/status')
-}
+export const fetchStatus = () => getJson<ApiStatus>('/api/status')
+export const fetchServices = () => getJson<CloudService[]>('/api/services')
+export const fetchResources = () => getJson<Resource[]>('/api/resources')
+export const fetchActiveIncidents = () => getJson<Incident[]>('/api/incidents/active')
+export const fetchAllIncidents = () => getJson<Incident[]>('/api/incidents')
+export const fetchMetrics = () => getJson<Metric[]>('/api/metrics')
+export const fetchAnomalies = () => getJson<Anomaly[]>('/api/anomalies')
+export const fetchRecoveryActions = () => getJson<RecoveryAction[]>('/api/recovery-actions')
 
-export function fetchServices() {
-  return getJson<CloudService[]>('/api/services')
-}
-
-export function fetchResources() {
-  return getJson<Resource[]>('/api/resources')
-}
-
-export function fetchActiveIncidents() {
-  return getJson<Incident[]>('/api/incidents/active')
+export async function uploadTerraform(file: File): Promise<unknown> {
+  const formData = new FormData()
+  formData.append('file', file)
+  const response = await fetch('/api/terraform/upload', {
+    method: 'POST',
+    body: formData,
+  })
+  if (!response.ok) throw new Error(`Upload error: ${response.status}`)
+  return response.json()
 }
