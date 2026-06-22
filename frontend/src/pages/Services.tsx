@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react'
 import { Upload } from 'lucide-react'
 import { StatusBadge } from '../components/StatusBadge'
-import { fetchServices, uploadTerraform, type CloudService } from '../api/client'
+import { TerraformUploadDialog } from '../components/TerraformUploadDialog'
+import { fetchServices, type CloudService } from '../api/client'
 import './Services.css'
 
 export function Services() {
   const [services, setServices] = useState<CloudService[]>([])
   const [loading, setLoading] = useState(true)
-  const [uploading, setUploading] = useState(false)
+  const [dialogOpen, setDialogOpen] = useState(false)
 
   async function load() {
     setLoading(true)
@@ -19,18 +20,6 @@ export function Services() {
 
   useEffect(() => { load() }, [])
 
-  async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
-    setUploading(true)
-    try {
-      await uploadTerraform(file)
-      await load()
-    } catch { /* empty */ }
-    setUploading(false)
-    e.target.value = ''
-  }
-
   if (loading) return <div className="page-loading">Duke ngarkuar...</div>
 
   return (
@@ -40,17 +29,10 @@ export function Services() {
           <h1>Cloud Services</h1>
           <p>Infrastructure services discovered from Terraform</p>
         </div>
-        <label className="upload-btn">
+        <button className="upload-btn" onClick={() => setDialogOpen(true)}>
           <Upload size={16} />
-          {uploading ? 'Uploading...' : 'Upload Terraform'}
-          <input
-            type="file"
-            accept=".tf,.zip"
-            onChange={handleUpload}
-            disabled={uploading}
-            hidden
-          />
-        </label>
+          Import Terraform
+        </button>
       </header>
 
       {services.length === 0 ? (
@@ -58,6 +40,10 @@ export function Services() {
           <Upload size={48} />
           <h3>No services discovered</h3>
           <p>Upload a Terraform file (.tf or .zip) to discover your infrastructure</p>
+          <button className="upload-btn" onClick={() => setDialogOpen(true)}>
+            <Upload size={16} />
+            Import Terraform
+          </button>
         </div>
       ) : (
         <div className="services-grid">
@@ -79,6 +65,12 @@ export function Services() {
           ))}
         </div>
       )}
+
+      <TerraformUploadDialog
+        open={dialogOpen}
+        onClose={() => setDialogOpen(false)}
+        onSuccess={() => { setDialogOpen(false); load() }}
+      />
     </div>
   )
 }
