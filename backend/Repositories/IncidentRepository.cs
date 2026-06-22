@@ -1,3 +1,4 @@
+using CloudGuard.Api.Constants;
 using CloudGuard.Api.Data;
 using CloudGuard.Api.Models;
 using CloudGuard.Api.Repositories.Interfaces;
@@ -11,22 +12,22 @@ public class IncidentRepository(CloudGuardDbContext dbContext) : IIncidentReposi
     public async Task<IReadOnlyList<EntityWithServiceName<Incident>>> GetAllWithServiceAsync(
         CancellationToken cancellationToken = default)
     {
-        var results = await QueryWithService()
-            .OrderByDescending(i => i.Entity.CreatedAt)
+        var results = await JoinQuery()
+            .OrderByDescending(x => x.incident.CreatedAt)
             .ToListAsync(cancellationToken);
 
-        return results;
+        return ToEntities(results);
     }
 
     public async Task<IReadOnlyList<EntityWithServiceName<Incident>>> GetActiveWithServiceAsync(
         CancellationToken cancellationToken = default)
     {
-        var results = await QueryWithService()
-            .Where(i => i.Entity.Status != Constants.IncidentStatus.Resolved)
-            .OrderByDescending(i => i.Entity.CreatedAt)
+        var results = await JoinQuery()
+            .Where(x => x.incident.Status != IncidentStatus.Resolved)
+            .OrderByDescending(x => x.incident.CreatedAt)
             .ToListAsync(cancellationToken);
 
-        return results;
+        return ToEntities(results);
     }
 
     public async Task<Incident?> GetByIdWithDetailsAsync(int id, CancellationToken cancellationToken = default) =>
@@ -40,12 +41,12 @@ public class IncidentRepository(CloudGuardDbContext dbContext) : IIncidentReposi
         int serviceId,
         CancellationToken cancellationToken = default)
     {
-        var results = await QueryWithService()
-            .Where(i => i.Entity.CloudServiceId == serviceId)
-            .OrderByDescending(i => i.Entity.CreatedAt)
+        var results = await JoinQuery()
+            .Where(x => x.incident.CloudServiceId == serviceId)
+            .OrderByDescending(x => x.incident.CreatedAt)
             .ToListAsync(cancellationToken);
 
-        return results;
+        return ToEntities(results);
     }
 
     public async Task<Incident?> GetByIdForUpdateAsync(int id, CancellationToken cancellationToken = default) =>
@@ -62,9 +63,18 @@ public class IncidentRepository(CloudGuardDbContext dbContext) : IIncidentReposi
     public async Task<bool> ExistsAsync(int id, CancellationToken cancellationToken = default) =>
         await dbContext.Incidents.AnyAsync(i => i.Id == id, cancellationToken);
 
-    private IQueryable<EntityWithServiceName<Incident>> QueryWithService() =>
+    private IQueryable<IncidentJoinRow> JoinQuery() =>
         from incident in dbContext.Incidents.AsNoTracking()
         join service in dbContext.CloudServices.AsNoTracking()
             on incident.CloudServiceId equals service.Id
-        select new EntityWithServiceName<Incident>(incident, service.Name);
+        select new IncidentJoinRow { incident = incident, serviceName = service.Name };
+
+    private static List<EntityWithServiceName<Incident>> ToEntities(List<IncidentJoinRow> rows) =>
+        rows.Select(x => new EntityWithServiceName<Incident>(x.incident, x.serviceName)).ToList();
+
+    private sealed class IncidentJoinRow
+    {
+        public Incident incident { get; init; } = null!;
+        public string serviceName { get; init; } = string.Empty;
+    }
 }

@@ -11,37 +11,50 @@ public class MetricRepository(CloudGuardDbContext dbContext) : IMetricRepository
     public async Task<IReadOnlyList<EntityWithServiceName<Metric>>> GetAllWithServiceAsync(
         CancellationToken cancellationToken = default)
     {
-        var results = await QueryWithService()
-            .OrderByDescending(m => m.Entity.RecordedAt)
+        var results = await JoinQuery()
+            .OrderByDescending(x => x.metric.RecordedAt)
             .ToListAsync(cancellationToken);
 
-        return results;
+        return ToEntities(results);
     }
 
     public async Task<EntityWithServiceName<Metric>?> GetByIdWithServiceAsync(
         int id,
-        CancellationToken cancellationToken = default) =>
-        await QueryWithService()
-            .FirstOrDefaultAsync(m => m.Entity.Id == id, cancellationToken);
+        CancellationToken cancellationToken = default)
+    {
+        var result = await JoinQuery()
+            .FirstOrDefaultAsync(x => x.metric.Id == id, cancellationToken);
+
+        return result is null ? null : new EntityWithServiceName<Metric>(result.metric, result.serviceName);
+    }
 
     public async Task<IReadOnlyList<EntityWithServiceName<Metric>>> GetByServiceIdWithServiceAsync(
         int serviceId,
         CancellationToken cancellationToken = default)
     {
-        var results = await QueryWithService()
-            .Where(m => m.Entity.CloudServiceId == serviceId)
-            .OrderByDescending(m => m.Entity.RecordedAt)
+        var results = await JoinQuery()
+            .Where(x => x.metric.CloudServiceId == serviceId)
+            .OrderByDescending(x => x.metric.RecordedAt)
             .ToListAsync(cancellationToken);
 
-        return results;
+        return ToEntities(results);
     }
 
     public async Task AddAsync(Metric metric, CancellationToken cancellationToken = default) =>
         await dbContext.Metrics.AddAsync(metric, cancellationToken);
 
-    private IQueryable<EntityWithServiceName<Metric>> QueryWithService() =>
+    private IQueryable<MetricJoinRow> JoinQuery() =>
         from metric in dbContext.Metrics.AsNoTracking()
         join service in dbContext.CloudServices.AsNoTracking()
             on metric.CloudServiceId equals service.Id
-        select new EntityWithServiceName<Metric>(metric, service.Name);
+        select new MetricJoinRow { metric = metric, serviceName = service.Name };
+
+    private static List<EntityWithServiceName<Metric>> ToEntities(List<MetricJoinRow> rows) =>
+        rows.Select(x => new EntityWithServiceName<Metric>(x.metric, x.serviceName)).ToList();
+
+    private sealed class MetricJoinRow
+    {
+        public Metric metric { get; init; } = null!;
+        public string serviceName { get; init; } = string.Empty;
+    }
 }
