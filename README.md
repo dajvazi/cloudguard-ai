@@ -1,94 +1,80 @@
 # CloudGuard AI
 
-Projekt full-stack me **React** (frontend) dhe **.NET** (backend API).
+Full-stack AIOps platform for cloud infrastructure monitoring, anomaly detection, and automated self-healing.
 
-## Struktura
+**Stack:** React + TypeScript (frontend) · ASP.NET Core + PostgreSQL (backend)
+
+## Features
+
+- **Terraform ingestion** — upload `.tf` or `.zip` files to discover infrastructure
+- **Service monitoring** — track cloud services, resources, and health status
+- **Anomaly detection** — background engine analyzes metrics using statistical thresholds (σ deviation)
+- **AI analysis** — OpenAI-powered root cause analysis with rule-based fallback
+- **Self-healing pipeline** — anomaly → incident → recovery action → healthy state in one call
+- **Operations dashboard** — real-time overview of services, incidents, and AI analysis
+
+## Project Structure
 
 ```
 cloudguard-ai/
 ├── backend/
-│   ├── Controllers/       # HTTP layer — vetëm request/response
-│   ├── Services/          # Business logic
-│   ├── Repositories/      # Data access (EF Core queries)
-│   ├── DTOs/              # Response models
-│   ├── Models/            # Database entities
-│   ├── Data/              # DbContext
-│   ├── Mappings/          # Entity → DTO
-│   └── Migrations/        # EF Core migrations
-└── frontend/              # React + TypeScript + Vite
+│   ├── Controllers/       # HTTP layer
+│   ├── Services/        # Business logic
+│   │   ├── AI/          # Anomaly engine, AI analysis, self-healing orchestrator
+│   │   └── Terraform/   # Parser, upload, archive extraction
+│   ├── Repositories/    # Data access (EF Core)
+│   ├── DTOs/            # Response models
+│   ├── Models/          # Database entities
+│   ├── Data/            # DbContext
+│   ├── Mappings/        # Entity → DTO
+│   └── Migrations/      # EF Core migrations
+├── frontend/
+│   ├── src/pages/       # Dashboard, Services, Incidents, AI Analysis, Recovery
+│   ├── src/components/  # Sidebar, StatCard, StatusBadge, TerraformUploadDialog
+│   └── src/api/         # API client
+└── samples/             # Sample Terraform files
 ```
 
-## Si ta nisësh
+## Getting Started
 
-Hap **dy terminale**:
+Open **two terminals**:
 
-### 1. Backend (.NET API)
+### 1. Database
 
-**Me auto-reload (rekomandohet gjatë zhvillimit)** — kur ruan një skedar `.cs`, serveri riniset vetë:
+Create the PostgreSQL database:
+
+```sql
+CREATE DATABASE cloudguard;
+```
+
+Connection string is in `backend/appsettings.Development.json`.
+
+### 2. Backend (.NET API)
+
+**Environment variables** — copy the example and add your OpenAI key:
+
+```bash
+cp backend/.env.example backend/.env
+# Edit backend/.env and set OpenAI__ApiKey
+```
+
+**Run with auto-reload** (recommended):
 
 ```bash
 cd backend
 dotnet watch run --launch-profile http
 ```
 
-Ose:
+Or:
 
 ```bash
 ./backend/dev.sh
 ```
 
-Në Cursor/VS Code: `Terminal` → `Run Task` → **backend: watch**
+API: `http://localhost:8080`  
+Swagger UI: `http://localhost:8080/swagger`
 
-**Pa auto-reload** (nisje e thjeshtë):
-
-```bash
-cd backend
-dotnet run
-```
-
-API do të jetë në: `http://localhost:8080`
-
-**Swagger UI** (vetëm në Development):
-
-```
-http://localhost:8080/swagger
-```
-
-Endpoints:
-- `GET /api/status` — kontrollon nëse API është online
-- `POST /api/terraform/upload` — upload `.tf` ose `.zip` (me module), parse dhe ruaj shërbimet
-- `GET /api/terraform/uploads` — lista e upload-eve
-- `GET /api/terraform/uploads/{id}` — detaje upload + shërbimet e zbuluara
-- `GET /api/services` — të gjitha shërbimet nga databaza
-- `GET /api/services/{id}` — një shërbim
-- `GET /api/services/by-upload/{uploadId}` — shërbimet nga një upload
-- `GET/POST /api/metrics` — metrikat (CPU, memory, latency, error rate)
-- `GET/POST /api/anomalies` — anomalitë e AI
-- `GET/POST /api/incidents` — incidentet (+ `GET /active`, `PATCH /resolve`)
-- `GET/POST /api/recovery-actions` — veprimet e self-healing (+ `PATCH /execute`)
-- `GET/POST /api/resources` — resurset e zbuluara nga Terraform (+ `GET /by-source`)
-
-Shembull upload me curl:
-
-```bash
-# Një skedar .tf
-curl -X POST http://localhost:8080/api/terraform/upload \
-  -F "file=@backend/samples/main.tf"
-
-# Projekti i plotë me module (.zip)
-cd backend/samples && zip -r ../samples.zip . -i "*.tf" && cd ..
-curl -X POST http://localhost:8080/api/terraform/upload \
-  -F "file=@backend/samples.zip"
-```
-
-Çdo shërbim kthen metadata Terraform:
-- `sourceKind` — resource / module / data
-- `rawResourceType` — p.sh. aws_db_instance
-- `sourceFile` — skedari ku u gjet
-- `moduleSource` — source i module-it (p.sh. ./modules/auth)
-- `parentModule` — moduli prind (p.sh. authentication)
-
-### 2. Frontend (React)
+### 3. Frontend (React)
 
 ```bash
 cd frontend
@@ -96,25 +82,97 @@ npm install
 npm run dev
 ```
 
-Aplikacioni do të hapet në: `http://localhost:5173`
+App: `http://localhost:5173`
 
-## Lidhja React ↔ .NET
+## API Endpoints
 
-1. **Vite proxy** — kërkesat nga React te `/api/*` ridrejtohen te backend (`frontend/vite.config.ts`)
-2. **CORS** — backend lejon origin-in `http://localhost:5173` (`backend/Program.cs`)
-3. **API client** — React thërret API-në nga `frontend/src/api/client.ts`
+| Area | Endpoints |
+|------|-----------|
+| Status | `GET /api/status` |
+| Terraform | `POST /api/terraform/upload`, `GET /api/terraform/uploads` |
+| Services | `GET /api/services`, `GET /api/services/{id}` |
+| Metrics | `GET/POST /api/metrics` |
+| Anomalies | `GET/POST /api/anomalies` |
+| Incidents | `GET /api/incidents`, `GET /api/incidents/active`, `PATCH /resolve` |
+| Recovery | `GET/POST /api/recovery-actions`, `PATCH /execute` |
+| Resources | `GET/POST /api/resources` |
+| Self-Healing | `POST /api/self-healing/trigger/{serviceId}`, `POST /api/self-healing/trigger/anomaly/{anomalyId}` |
 
-Shembull në React:
+### Terraform Upload
 
-```ts
-import { fetchStatus } from './api/client'
+```bash
+# Single .tf file
+curl -X POST http://localhost:8080/api/terraform/upload \
+  -F "file=@samples/cloudguard-infra.tf"
 
-const status = await fetchStatus()
-console.log(status.message) // "CloudGuard API është online!"
+# Full project with modules (.zip)
+cd backend/samples && zip -r ../samples.zip . -i "*.tf" && cd ..
+curl -X POST http://localhost:8080/api/terraform/upload \
+  -F "file=@backend/samples.zip"
 ```
 
-## Zhvillim
+### Self-Healing
 
-- Shto controller të ri në `backend/Controllers/`
-- Shto funksione API në `frontend/src/api/client.ts`
-- Thirri API-në nga komponentët React me `fetch` ose client-in ekzistues
+```bash
+# Trigger by service ID
+curl -X POST http://localhost:8080/api/self-healing/trigger/52
+
+# Trigger by anomaly ID
+curl -X POST http://localhost:8080/api/self-healing/trigger/anomaly/17
+```
+
+## Self-Healing Pipeline
+
+```
+Metrics Collection → AI Analysis → Anomaly Detection → Incident Creation → Recovery Engine → Service Restart → Healthy State
+```
+
+1. **AnomalyDetectionEngine** (BackgroundService) — scans metrics every 30s, detects σ deviations
+2. **AiAnalysisService** — calls OpenAI for root cause + recommended action (falls back to rules)
+3. **SelfHealingOrchestrator** — chains anomaly → incident → recovery → healthy in one request
+
+## Configuration
+
+| File | Purpose |
+|------|---------|
+| `backend/appsettings.Development.json` | DB connection string, logging |
+| `backend/.env` | OpenAI API key (gitignored) |
+| `backend/.env.example` | Template for environment variables |
+| `frontend/vite.config.ts` | Vite proxy to backend on port 8080 |
+
+**OpenAI** (optional — without a key, rule-based analysis is used):
+
+```env
+# backend/.env
+OpenAI__ApiKey=sk-your-key-here
+OpenAI__Model=gpt-4o-mini
+```
+
+## Architecture
+
+```
+Controller → Service → Repository → DbContext → PostgreSQL
+```
+
+- **Controllers** — HTTP only, no business logic
+- **Services** — business rules, orchestration
+- **Repositories** — EF Core queries, data access
+- **DTOs** — API response models, separated from entities
+
+## Frontend Pages
+
+| Route | Page |
+|-------|------|
+| `/` | Dashboard — stats, service health, incidents, AI analysis |
+| `/services` | Cloud services grid + Terraform upload dialog |
+| `/resources` | Discovered infrastructure resources |
+| `/anomalies` | AI anomaly detection results |
+| `/incidents` | Incident table with auto-heal buttons |
+| `/recovery` | Self-healing pipeline visualization + history |
+
+## Development
+
+- Add controllers in `backend/Controllers/`
+- Register services in `backend/Extensions/ServiceCollectionExtensions.cs`
+- Add API functions in `frontend/src/api/client.ts`
+- Migrations run automatically on backend startup
