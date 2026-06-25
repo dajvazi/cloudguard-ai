@@ -26,4 +26,20 @@ public class TerraformUploadRepository(CloudGuardDbContext dbContext) : ITerrafo
         await dbContext.Entry(upload)
             .Collection(u => u.CloudServices)
             .LoadAsync(cancellationToken);
+
+    public async Task DeleteAllTerraformDataAsync(CancellationToken cancellationToken = default)
+    {
+        var terraformServices = await dbContext.CloudServices
+            .Where(s => s.TerraformUploadId != null)
+            .ToListAsync(cancellationToken);
+        dbContext.CloudServices.RemoveRange(terraformServices);
+
+        var resources = await dbContext.Resources.ToListAsync(cancellationToken);
+        dbContext.Resources.RemoveRange(resources);
+
+        var uploads = await dbContext.TerraformUploads.ToListAsync(cancellationToken);
+        dbContext.TerraformUploads.RemoveRange(uploads);
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
 }

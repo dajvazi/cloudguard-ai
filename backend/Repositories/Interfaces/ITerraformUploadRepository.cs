@@ -8,4 +8,5 @@ public interface ITerraformUploadRepository
     Task<TerraformUpload?> GetByIdWithServicesAsync(int id, CancellationToken cancellationToken = default);
     Task AddAsync(TerraformUpload upload, CancellationToken cancellationToken = default);
     Task LoadServicesAsync(TerraformUpload upload, CancellationToken cancellationToken = default);
+    Task DeleteAllTerraformDataAsync(CancellationToken cancellationToken = default);
 }

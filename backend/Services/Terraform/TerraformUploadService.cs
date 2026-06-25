@@ -21,6 +21,9 @@ public class TerraformUploadService(
         var parsedResources = projectParser.ParseProject(files);
         var discoveredAt = DateTime.UtcNow;
 
+        // Overwrite: remove previous terraform-sourced services and resources
+        await terraformUploadRepository.DeleteAllTerraformDataAsync(cancellationToken);
+
         var upload = new TerraformUpload
         {
             FileName = file.FileName,

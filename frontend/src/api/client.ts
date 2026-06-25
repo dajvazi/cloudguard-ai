@@ -44,10 +44,19 @@ export interface Metric {
   id: number
   cloudServiceId: number
   cloudServiceName: string
+  metricName: string | null
+  unit: string | null
   cpuUsage: number | null
   memoryUsage: number | null
+  networkIn: number | null
+  networkOut: number | null
+  diskReadBytes: number | null
+  diskWriteBytes: number | null
   latencyMs: number | null
   errorRate: number | null
+  value: number | null
+  maximum: number | null
+  minimum: number | null
   recordedAt: string
 }
 
@@ -85,6 +94,7 @@ export const fetchResources = () => getJson<Resource[]>('/api/resources')
 export const fetchActiveIncidents = () => getJson<Incident[]>('/api/incidents/active')
 export const fetchAllIncidents = () => getJson<Incident[]>('/api/incidents')
 export const fetchMetrics = () => getJson<Metric[]>('/api/metrics')
+export const fetchMetricsByService = (serviceId: number) => getJson<Metric[]>(`/api/metrics/by-service/${serviceId}`)
 export const fetchAnomalies = () => getJson<Anomaly[]>('/api/anomalies')
 export const fetchRecoveryActions = () => getJson<RecoveryAction[]>('/api/recovery-actions')
 
@@ -127,4 +137,56 @@ export function triggerSelfHealingFromAnomaly(anomalyId: number): Promise<SelfHe
       if (!r.ok) throw new Error(`Self-healing error: ${r.status}`)
       return r.json() as Promise<SelfHealingResult>
     })
+}
+
+// AWS CloudWatch
+export interface AwsAlarm {
+  alarmName: string
+  namespace: string
+  metricName: string
+  stateValue: string
+  stateReason: string | null
+  threshold: number
+  comparisonOperator: string
+  stateUpdatedAt: string | null
+}
+
+export interface AwsMetricData {
+  namespace: string
+  metricName: string
+  instanceId: string | null
+  average: number
+  maximum: number
+  minimum: number
+  timestamp: string
+}
+
+export interface AwsImportResult {
+  success: boolean
+  message: string
+  alarmsImported: number
+  metricsImported: number
+  servicesDiscovered: number
+  alarms: AwsAlarm[]
+  metrics: AwsMetricData[]
+}
+
+export interface AwsConnectionResult {
+  connected: boolean
+  message: string
+}
+
+export function testAwsConnection(): Promise<AwsConnectionResult> {
+  return getJson<AwsConnectionResult>('/api/aws/test-connection')
+}
+
+export function importAwsCloudWatch(region: string, namespace?: string, periodMinutes = 60): Promise<AwsImportResult> {
+  return fetch('/api/aws/import', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ region, namespace: namespace || null, periodMinutes }),
+  }).then(r => {
+    if (!r.ok) throw new Error(`AWS import error: ${r.status}`)
+    return r.json() as Promise<AwsImportResult>
+  })
 }

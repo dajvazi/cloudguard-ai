@@ -42,10 +42,19 @@ public class CloudGuardDbContext(DbContextOptions<CloudGuardDbContext> options) 
             entity.ToTable("metrics");
             entity.Property(e => e.Id).HasColumnName("id");
             entity.Property(e => e.CloudServiceId).HasColumnName("cloud_service_id");
-            entity.Property(e => e.CpuUsage).HasColumnName("cpu_usage").HasPrecision(5, 2);
-            entity.Property(e => e.MemoryUsage).HasColumnName("memory_usage").HasPrecision(5, 2);
+            entity.Property(e => e.MetricName).HasColumnName("metric_name").HasMaxLength(100);
+            entity.Property(e => e.Unit).HasColumnName("unit").HasMaxLength(30);
+            entity.Property(e => e.CpuUsage).HasColumnName("cpu_usage").HasPrecision(10, 2);
+            entity.Property(e => e.MemoryUsage).HasColumnName("memory_usage").HasPrecision(10, 2);
+            entity.Property(e => e.NetworkIn).HasColumnName("network_in").HasPrecision(15, 2);
+            entity.Property(e => e.NetworkOut).HasColumnName("network_out").HasPrecision(15, 2);
+            entity.Property(e => e.DiskReadBytes).HasColumnName("disk_read_bytes").HasPrecision(15, 2);
+            entity.Property(e => e.DiskWriteBytes).HasColumnName("disk_write_bytes").HasPrecision(15, 2);
             entity.Property(e => e.LatencyMs).HasColumnName("latency_ms").HasPrecision(10, 2);
             entity.Property(e => e.ErrorRate).HasColumnName("error_rate").HasPrecision(5, 2);
+            entity.Property(e => e.Value).HasColumnName("value").HasPrecision(15, 2);
+            entity.Property(e => e.Maximum).HasColumnName("maximum").HasPrecision(15, 2);
+            entity.Property(e => e.Minimum).HasColumnName("minimum").HasPrecision(15, 2);
             entity.Property(e => e.RecordedAt).HasColumnName("recorded_at").HasDefaultValueSql("CURRENT_TIMESTAMP");
 
             entity.HasOne(e => e.CloudService)

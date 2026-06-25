@@ -4,10 +4,19 @@ public record MetricDto(
     int Id,
     int CloudServiceId,
     string CloudServiceName,
+    string? MetricName,
+    string? Unit,
     decimal? CpuUsage,
     decimal? MemoryUsage,
+    decimal? NetworkIn,
+    decimal? NetworkOut,
+    decimal? DiskReadBytes,
+    decimal? DiskWriteBytes,
     decimal? LatencyMs,
     decimal? ErrorRate,
+    decimal? Value,
+    decimal? Maximum,
+    decimal? Minimum,
     DateTime RecordedAt);
 
 public record AnomalyDto(

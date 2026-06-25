@@ -7,6 +7,9 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="AWSSDK.CloudWatch" Version="4.0.12.6" />
+    <PackageReference Include="AWSSDK.EC2" Version="4.0.94.1" />
+    <PackageReference Include="AWSSDK.Extensions.NETCore.Setup" Version="4.0.4.11" />
     <PackageReference Include="DotNetEnv" Version="3.2.0" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.9">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>

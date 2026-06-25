@@ -8,9 +8,11 @@ import {
   Zap,
   RefreshCw,
   Sparkles,
+  Cloud,
 } from 'lucide-react'
 import { StatCard } from '../components/StatCard'
 import { StatusBadge } from '../components/StatusBadge'
+import { CloudImportDialog } from '../components/CloudImportDialog'
 import {
   fetchServices,
   fetchActiveIncidents,
@@ -31,6 +33,7 @@ export function Dashboard() {
   const [refreshing, setRefreshing] = useState(false)
   const [healingId, setHealingId] = useState<number | null>(null)
   const [healResult, setHealResult] = useState<SelfHealingResult | null>(null)
+  const [cloudImportOpen, setCloudImportOpen] = useState(false)
 
   const load = useCallback(async (showRefresh = false) => {
     if (showRefresh) setRefreshing(true)
@@ -80,6 +83,13 @@ export function Dashboard() {
           <p>Real-time cloud health, anomaly detection, and automated remediation</p>
         </div>
         <div className="header-actions">
+          <button
+            className="btn-secondary"
+            onClick={() => setCloudImportOpen(true)}
+          >
+            <Cloud size={14} />
+            Import Cloud
+          </button>
           <button
             className="btn-icon"
             onClick={() => load(true)}
@@ -214,6 +224,11 @@ export function Dashboard() {
           </div>
         </section>
       )}
+      <CloudImportDialog
+        open={cloudImportOpen}
+        onClose={() => setCloudImportOpen(false)}
+        onSuccess={() => { setCloudImportOpen(false); load(true) }}
+      />
     </div>
   )
 }

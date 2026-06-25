@@ -1,7 +1,9 @@
+using Amazon.CloudWatch;
 using CloudGuard.Api.Repositories;
 using CloudGuard.Api.Repositories.Interfaces;
 using CloudGuard.Api.Services.AI;
 using CloudGuard.Api.Services.Anomalies;
+using CloudGuard.Api.Services.AWS;
 using CloudGuard.Api.Services.CloudServices;
 using CloudGuard.Api.Services.Incidents;
 using CloudGuard.Api.Services.Metrics;
@@ -47,6 +49,15 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IAiAnalysisService, AiAnalysisService>();
         services.AddScoped<ISelfHealingOrchestrator, SelfHealingOrchestrator>();
         services.AddHostedService<AnomalyDetectionEngine>();
+
+        // AWS
+        services.AddDefaultAWSOptions(new Amazon.Extensions.NETCore.Setup.AWSOptions
+        {
+            Region = Amazon.RegionEndpoint.GetBySystemName(
+                Environment.GetEnvironmentVariable("AWS_DEFAULT_REGION") ?? "us-east-1"),
+        });
+        services.AddAWSService<IAmazonCloudWatch>();
+        services.AddScoped<IAwsCloudWatchService, AwsCloudWatchService>();
 
         return services;
     }

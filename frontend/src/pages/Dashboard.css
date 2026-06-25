@@ -243,6 +243,26 @@
   gap: 12px;
 }
 
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  transition: all 0.15s;
+}
+
+.btn-secondary:hover {
+  border-color: var(--accent);
+  color: var(--accent-hover);
+  background: var(--accent-bg);
+}
+
 .btn-icon {
   width: 34px;
   height: 34px;

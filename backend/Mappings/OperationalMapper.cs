@@ -10,10 +10,19 @@ public static class OperationalMapper
             entity.Id,
             entity.CloudServiceId,
             serviceName,
+            entity.MetricName,
+            entity.Unit,
             entity.CpuUsage,
             entity.MemoryUsage,
+            entity.NetworkIn,
+            entity.NetworkOut,
+            entity.DiskReadBytes,
+            entity.DiskWriteBytes,
             entity.LatencyMs,
             entity.ErrorRate,
+            entity.Value,
+            entity.Maximum,
+            entity.Minimum,
             entity.RecordedAt);
 
     public static AnomalyDto ToDto(this Anomaly entity, string serviceName) =>

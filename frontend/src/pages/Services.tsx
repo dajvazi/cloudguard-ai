@@ -1,24 +1,48 @@
-import { useEffect, useState } from 'react'
-import { Upload } from 'lucide-react'
+import { useEffect, useState, useMemo } from 'react'
+import { Upload, Cloud, ChevronDown, ChevronUp } from 'lucide-react'
 import { StatusBadge } from '../components/StatusBadge'
 import { TerraformUploadDialog } from '../components/TerraformUploadDialog'
-import { fetchServices, type CloudService } from '../api/client'
+import { CloudImportDialog } from '../components/CloudImportDialog'
+import { ServiceMetricsPanel } from '../components/ServiceMetricsPanel'
+import {
+  fetchServices,
+  fetchMetrics,
+  type CloudService,
+  type Metric,
+} from '../api/client'
 import './Services.css'
 
 export function Services() {
   const [services, setServices] = useState<CloudService[]>([])
+  const [metrics, setMetrics] = useState<Metric[]>([])
   const [loading, setLoading] = useState(true)
-  const [dialogOpen, setDialogOpen] = useState(false)
+  const [terraformOpen, setTerraformOpen] = useState(false)
+  const [cloudOpen, setCloudOpen] = useState(false)
+  const [expandedId, setExpandedId] = useState<number | null>(null)
+
+  const metricsByService = useMemo(() => {
+    const map: Record<number, Metric[]> = {}
+    for (const m of metrics) {
+      if (!map[m.cloudServiceId]) map[m.cloudServiceId] = []
+      map[m.cloudServiceId].push(m)
+    }
+    return map
+  }, [metrics])
 
   async function load() {
     setLoading(true)
     try {
-      setServices(await fetchServices())
+      const [svc, met] = await Promise.allSettled([fetchServices(), fetchMetrics()])
+      if (svc.status === 'fulfilled') setServices(svc.value)
+      if (met.status === 'fulfilled') setMetrics(met.value)
     } catch { /* empty */ }
     setLoading(false)
   }
 
   useEffect(() => { load() }, [])
+
+  const servicesWithMetrics = services.filter((s) => (metricsByService[s.id]?.length ?? 0) > 0)
+  const servicesWithoutMetrics = services.filter((s) => (metricsByService[s.id]?.length ?? 0) === 0)
 
   if (loading) return <div className="page-loading">Duke ngarkuar...</div>
 
@@ -27,39 +51,119 @@ export function Services() {
       <header className="page-header">
         <div>
           <h1>Cloud Services</h1>
-          <p>Infrastructure services discovered from Terraform</p>
+          <p>Monitorim i metrikave për çdo resource — CPU, Network, Disk, Status</p>
         </div>
-        <button className="upload-btn" onClick={() => setDialogOpen(true)}>
-          <Upload size={16} />
-          Import Terraform
-        </button>
-      </header>
-
-      {services.length === 0 ? (
-        <div className="empty-state-large">
-          <Upload size={48} />
-          <h3>No services discovered</h3>
-          <p>Upload a Terraform file (.tf or .zip) to discover your infrastructure</p>
-          <button className="upload-btn" onClick={() => setDialogOpen(true)}>
+        <div className="header-btns">
+          <button className="upload-btn" onClick={() => setCloudOpen(true)}>
+            <Cloud size={16} />
+            Import Cloud
+          </button>
+          <button className="upload-btn upload-btn--secondary" onClick={() => setTerraformOpen(true)}>
             <Upload size={16} />
             Import Terraform
           </button>
         </div>
+      </header>
+
+      {services.length === 0 ? (
+        <div className="empty-state-large">
+          <Cloud size={48} />
+          <h3>No services discovered</h3>
+          <p>Import from AWS CloudWatch or upload a Terraform file to discover your infrastructure</p>
+          <div className="header-btns">
+            <button className="upload-btn" onClick={() => setCloudOpen(true)}>
+              <Cloud size={16} />
+              Import Cloud
+            </button>
+            <button className="upload-btn upload-btn--secondary" onClick={() => setTerraformOpen(true)}>
+              <Upload size={16} />
+              Import Terraform
+            </button>
+          </div>
+        </div>
       ) : (
-        <div className="services-grid">
-          {services.map((svc) => (
+        <div className="services-list">
+          {servicesWithMetrics.map((svc) => {
+            const svcMetrics = metricsByService[svc.id] ?? []
+            const expanded = expandedId === svc.id
+
+            return (
+              <div className="service-card service-card--monitored" key={svc.id}>
+                <div
+                  className="service-card-header"
+                  onClick={() => setExpandedId(expanded ? null : svc.id)}
+                >
+                  <div className="service-card-info">
+                    <strong>{svc.name}</strong>
+                    <span className="service-card-type">{svc.type}</span>
+                    {svc.sourceKind && (
+                      <span className={`source-badge source-badge--${svc.sourceKind}`}>
+                        {svc.sourceKind}
+                      </span>
+                    )}
+                    <span className="metric-count-badge">{svcMetrics.length} metrics</span>
+                  </div>
+                  <div className="service-card-right">
+                    <StatusBadge status={svc.status} size="sm" />
+                    {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                  </div>
+                </div>
+
+                {svc.description && (
+                  <p className="service-card-desc">{svc.description}</p>
+                )}
+
+                <ServiceMetricsPanel metrics={svcMetrics} compact={!expanded} />
+
+                {expanded && (
+                  <div className="metrics-detail-table-wrap">
+                    <table className="metrics-detail-table">
+                      <thead>
+                        <tr>
+                          <th>Metric</th>
+                          <th>Avg</th>
+                          <th>Max</th>
+                          <th>Min</th>
+                          <th>Unit</th>
+                          <th>Time</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {svcMetrics.map((m) => (
+                          <tr key={m.id}>
+                            <td>{m.metricName || '—'}</td>
+                            <td className="val">{m.value?.toFixed(2) ?? '—'}</td>
+                            <td>{m.maximum?.toFixed(2) ?? '—'}</td>
+                            <td>{m.minimum?.toFixed(2) ?? '—'}</td>
+                            <td>{m.unit || '—'}</td>
+                            <td>{new Date(m.recordedAt).toLocaleString()}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )
+          })}
+
+          {servicesWithoutMetrics.map((svc) => (
             <div className="service-card" key={svc.id}>
               <div className="service-card-header">
-                <strong>{svc.name}</strong>
+                <div className="service-card-info">
+                  <strong>{svc.name}</strong>
+                  <span className="service-card-type">{svc.type}</span>
+                  {svc.sourceKind && (
+                    <span className={`source-badge source-badge--${svc.sourceKind}`}>
+                      {svc.sourceKind}
+                    </span>
+                  )}
+                </div>
                 <StatusBadge status={svc.status} size="sm" />
               </div>
-              <span className="service-card-type">{svc.type}</span>
-              {svc.description && (
-                <p className="service-card-desc">{svc.description}</p>
-              )}
-              <div className="service-card-meta">
-                {svc.sourceFile && <span>{svc.sourceFile}</span>}
-                {svc.parentModule && <span>module: {svc.parentModule}</span>}
+              {svc.description && <p className="service-card-desc">{svc.description}</p>}
+              <div className="metrics-panel-empty">
+                Nuk ka metrika — importo nga AWS CloudWatch
               </div>
             </div>
           ))}
@@ -67,9 +171,14 @@ export function Services() {
       )}
 
       <TerraformUploadDialog
-        open={dialogOpen}
-        onClose={() => setDialogOpen(false)}
-        onSuccess={() => { setDialogOpen(false); load() }}
+        open={terraformOpen}
+        onClose={() => setTerraformOpen(false)}
+        onSuccess={() => { setTerraformOpen(false); load() }}
+      />
+      <CloudImportDialog
+        open={cloudOpen}
+        onClose={() => setCloudOpen(false)}
+        onSuccess={() => { setCloudOpen(false); load() }}
       />
     </div>
   )
