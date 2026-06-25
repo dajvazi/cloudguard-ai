@@ -1,9 +1,12 @@
 using Amazon.CloudWatch;
+using Amazon.SimpleSystemsManagement;
 using CloudGuard.Api.Repositories;
 using CloudGuard.Api.Repositories.Interfaces;
 using CloudGuard.Api.Services.AI;
 using CloudGuard.Api.Services.Anomalies;
+using CloudGuard.Api.Services.Admin;
 using CloudGuard.Api.Services.AWS;
+using CloudGuard.Api.Services.AWS.Runbooks;
 using CloudGuard.Api.Services.CloudServices;
 using CloudGuard.Api.Services.Incidents;
 using CloudGuard.Api.Services.Metrics;
@@ -49,6 +52,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IAiAnalysisService, AiAnalysisService>();
         services.AddScoped<ISelfHealingOrchestrator, SelfHealingOrchestrator>();
         services.AddHostedService<AnomalyDetectionEngine>();
+        services.AddHostedService<AutoHealWorker>();
 
         // AWS
         services.AddDefaultAWSOptions(new Amazon.Extensions.NETCore.Setup.AWSOptions
@@ -57,7 +61,12 @@ public static class ServiceCollectionExtensions
                 Environment.GetEnvironmentVariable("AWS_DEFAULT_REGION") ?? "us-east-1"),
         });
         services.AddAWSService<IAmazonCloudWatch>();
+        services.AddAWSService<IAmazonSimpleSystemsManagement>();
         services.AddScoped<IAwsCloudWatchService, AwsCloudWatchService>();
+        services.AddScoped<IAwsImportEvaluator, AwsImportEvaluator>();
+        services.AddScoped<IAwsSsmService, AwsSsmService>();
+        services.AddSingleton<IRunbookService, RunbookService>();
+        services.AddScoped<IDataPurgeService, DataPurgeService>();
 
         return services;
     }

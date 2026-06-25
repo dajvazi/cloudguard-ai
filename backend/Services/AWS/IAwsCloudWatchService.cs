@@ -17,6 +17,8 @@ public record AwsImportResult(
     int AlarmsImported,
     int MetricsImported,
     int ServicesDiscovered,
+    int AnomaliesCreated,
+    int IncidentsCreated,
     List<AwsAlarmDto> Alarms,
     List<AwsMetricDataDto> Metrics);
 
@@ -28,7 +30,8 @@ public record AwsAlarmDto(
     string? StateReason,
     decimal Threshold,
     string ComparisonOperator,
-    DateTime? StateUpdatedAt);
+    DateTime? StateUpdatedAt,
+    string? InstanceId = null);
 
 public record AwsMetricDataDto(
     string Namespace,

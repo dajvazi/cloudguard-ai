@@ -9,7 +9,8 @@ import {
   ShieldCheck,
 } from 'lucide-react'
 import { StatusBadge } from '../components/StatusBadge'
-import { fetchRecoveryActions, type RecoveryAction } from '../api/client'
+import { DeleteAllButton } from '../components/DeleteAllButton'
+import { fetchRecoveryActions, purgeRecoveryActions, type RecoveryAction } from '../api/client'
 import './Recovery.css'
 
 const pipelineSteps = [
@@ -26,9 +27,12 @@ export function Recovery() {
   const [actions, setActions] = useState<RecoveryAction[]>([])
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
+  function load() {
+    setLoading(true)
     fetchRecoveryActions().then(setActions).catch(() => {}).finally(() => setLoading(false))
-  }, [])
+  }
+
+  useEffect(() => { load() }, [])
 
   if (loading) return <div className="page-loading">Duke ngarkuar...</div>
 
@@ -39,6 +43,12 @@ export function Recovery() {
           <h1>Recovery Actions</h1>
           <p>Self-healing pipeline and automated remediation</p>
         </div>
+        <DeleteAllButton
+          label="Delete All"
+          confirmMessage="Fshi të gjitha recovery actions? Ky veprim nuk kthehet mbrapsht."
+          onDelete={purgeRecoveryActions}
+          onSuccess={() => load()}
+        />
       </header>
 
       <section className="pipeline-section">

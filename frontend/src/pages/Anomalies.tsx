@@ -1,16 +1,54 @@
 import { useEffect, useState } from 'react'
-import { BrainCircuit } from 'lucide-react'
+import { BrainCircuit, Sparkles, RefreshCw } from 'lucide-react'
 import { StatusBadge } from '../components/StatusBadge'
-import { fetchAnomalies, type Anomaly } from '../api/client'
+import { DeleteAllButton } from '../components/DeleteAllButton'
+import { SelfHealingBanner } from '../components/SelfHealingBanner'
+import {
+  fetchAnomalies,
+  purgeAnomalies,
+  triggerSelfHealingFromAnomaly,
+  type Anomaly,
+  type SelfHealingResult,
+} from '../api/client'
 import './Anomalies.css'
+import '../components/SelfHealingBanner.css'
 
 export function Anomalies() {
   const [anomalies, setAnomalies] = useState<Anomaly[]>([])
   const [loading, setLoading] = useState(true)
+  const [healingId, setHealingId] = useState<number | null>(null)
+  const [healResult, setHealResult] = useState<SelfHealingResult | null>(null)
 
-  useEffect(() => {
+  function load() {
+    setLoading(true)
     fetchAnomalies().then(setAnomalies).catch(() => {}).finally(() => setLoading(false))
-  }, [])
+  }
+
+  useEffect(() => { load() }, [])
+
+  async function handleHeal(anomalyId: number) {
+    setHealingId(anomalyId)
+    setHealResult(null)
+    try {
+      const result = await triggerSelfHealingFromAnomaly(anomalyId)
+      setHealResult(result)
+      await load()
+    } catch {
+      setHealResult({
+        success: false,
+        message: 'Self-healing failed',
+        anomalyId: null,
+        incidentId: null,
+        recoveryActionId: null,
+        runbookId: null,
+        ssmCommandId: null,
+        executionOutput: null,
+        executedViaSsm: false,
+        aiAnalysis: null,
+      })
+    }
+    setHealingId(null)
+  }
 
   if (loading) return <div className="page-loading">Duke ngarkuar...</div>
 
@@ -19,10 +57,22 @@ export function Anomalies() {
       <header className="page-header">
         <div>
           <h1>AI Analysis</h1>
-          <p>Anomaly detection and AI-powered evaluation</p>
+          <p>Anomaly detection and AI-powered self-healing</p>
         </div>
-        <span className="anomaly-total">{anomalies.length} detected</span>
+        <div className="page-header-actions">
+          <span className="anomaly-total">{anomalies.length} detected</span>
+          <DeleteAllButton
+            label="Delete All"
+            confirmMessage="Fshi të gjitha anomalitë? Ky veprim nuk kthehet mbrapsht."
+            onDelete={purgeAnomalies}
+            onSuccess={() => load()}
+          />
+        </div>
       </header>
+
+      {healResult && (
+        <SelfHealingBanner result={healResult} onClose={() => setHealResult(null)} />
+      )}
 
       {anomalies.length === 0 ? (
         <div className="empty-state-large">
@@ -58,9 +108,18 @@ export function Anomalies() {
                     <span className="confidence-pct">{a.aiConfidence}%</span>
                   </div>
                 )}
-                <span className="anomaly-detail-time">
-                  {new Date(a.detectedAt).toLocaleString()}
-                </span>
+                <button
+                  type="button"
+                  className="btn-heal"
+                  onClick={() => handleHeal(a.id)}
+                  disabled={healingId !== null}
+                >
+                  {healingId === a.id ? (
+                    <><RefreshCw size={13} className="spinner" /> Healing...</>
+                  ) : (
+                    <><Sparkles size={13} /> Self-Heal</>
+                  )}
+                </button>
               </div>
             </div>
           ))}

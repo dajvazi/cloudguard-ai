@@ -10,7 +10,6 @@ public class AnomalyDetectionEngine(
     ILogger<AnomalyDetectionEngine> logger) : BackgroundService
 {
     private static readonly TimeSpan CheckInterval = TimeSpan.FromSeconds(30);
-    private static readonly int MinSamplesRequired = 3;
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -45,15 +44,50 @@ public class AnomalyDetectionEngine(
             var metrics = await db.Metrics
                 .Where(m => m.CloudServiceId == service.Id)
                 .OrderByDescending(m => m.RecordedAt)
-                .Take(20)
+                .Take(100)
                 .ToListAsync(ct);
 
-            if (metrics.Count < MinSamplesRequired) continue;
+            if (metrics.Count == 0) continue;
 
-            var latest = metrics[0];
-            var historical = metrics.Skip(1).ToList();
+            var detectedAnomalies = new List<Anomaly>();
 
-            var detectedAnomalies = DetectAnomalies(service, latest, historical);
+            var cpuMetrics = metrics
+                .Where(m => m.MetricName == "CPUUtilization" && (m.CpuUsage.HasValue || m.Value.HasValue))
+                .ToList();
+
+            if (cpuMetrics.Count > 0)
+            {
+                var peakCpu = cpuMetrics.Max(m => m.CpuUsage ?? m.Value ?? 0);
+                var latestCpu = cpuMetrics[0];
+                var cpuHistory = cpuMetrics.Skip(1).ToList();
+
+                CheckAbsoluteThreshold(
+                    detectedAnomalies, service, "High CPU Usage", peakCpu, 80m, Severity.Critical);
+
+                if (cpuHistory.Count >= 2)
+                {
+                    detectedAnomalies.AddRange(DetectAnomalies(
+                        service, latestCpu, cpuHistory, useCpu: true));
+                }
+            }
+
+            var latestMemory = LatestMetric(metrics, m => m.MemoryUsage.HasValue);
+            var memoryHistory = HistoryFor(metrics, m => m.MemoryUsage.HasValue);
+
+            var latestLatency = LatestMetric(metrics, m => m.LatencyMs.HasValue);
+            var latencyHistory = HistoryFor(metrics, m => m.LatencyMs.HasValue);
+
+            var latestError = LatestMetric(metrics, m => m.ErrorRate.HasValue);
+            var errorHistory = HistoryFor(metrics, m => m.ErrorRate.HasValue);
+
+            if (latestMemory is not null && memoryHistory.Count >= 2)
+                detectedAnomalies.AddRange(DetectAnomalies(service, latestMemory, memoryHistory, useCpu: false));
+
+            if (latestLatency is not null && latencyHistory.Count >= 2)
+                detectedAnomalies.AddRange(DetectAnomalies(service, latestLatency, latencyHistory, useCpu: false, latencyMode: true));
+
+            if (latestError is not null && errorHistory.Count >= 2)
+                detectedAnomalies.AddRange(DetectAnomalies(service, latestError, errorHistory, useCpu: false, errorMode: true));
 
             foreach (var anomaly in detectedAnomalies)
             {
@@ -69,34 +103,108 @@ public class AnomalyDetectionEngine(
                 logger.LogWarning(
                     "Anomaly detected: {Type} on {Service} (confidence: {Confidence}%)",
                     anomaly.AnomalyType, service.Name, anomaly.AiConfidence);
+
+                if (anomaly.Severity is Severity.Critical or Severity.Warning)
+                {
+                    var openIncident = await db.Incidents.AnyAsync(i =>
+                        i.CloudServiceId == service.Id &&
+                        i.Status != IncidentStatus.Resolved &&
+                        i.Title.Contains(anomaly.AnomalyType!), ct);
+
+                    if (!openIncident)
+                    {
+                        db.Incidents.Add(new Incident
+                        {
+                            CloudServiceId = service.Id,
+                            Title = $"[Auto] {anomaly.AnomalyType} on {service.Name}",
+                            Severity = anomaly.Severity,
+                            Status = IncidentStatus.Open,
+                            RootCause = anomaly.Description,
+                            CreatedAt = DateTime.UtcNow,
+                        });
+
+                        var trackedService = await db.CloudServices.FirstAsync(s => s.Id == service.Id, ct);
+                        trackedService.Status = anomaly.Severity == Severity.Critical
+                            ? ServiceStatus.Critical
+                            : ServiceStatus.Warning;
+                    }
+                }
             }
         }
 
         await db.SaveChangesAsync(ct);
     }
 
+    private static Metric? LatestMetric(
+        List<Metric> metrics,
+        Func<Metric, bool> predicate,
+        Func<Metric, bool>? namePredicate = null) =>
+        metrics.FirstOrDefault(m => predicate(m) && (namePredicate is null || namePredicate(m)));
+
+    private static List<Metric> HistoryFor(
+        List<Metric> metrics,
+        Func<Metric, bool> predicate,
+        Func<Metric, bool>? namePredicate = null) =>
+        metrics.Where(m => predicate(m) && (namePredicate is null || namePredicate(m))).Skip(1).ToList();
+
+    private static void CheckAbsoluteThreshold(
+        List<Anomaly> anomalies,
+        CloudService service,
+        string anomalyType,
+        decimal currentValue,
+        decimal threshold,
+        string severity)
+    {
+        if (currentValue < threshold) return;
+
+        anomalies.Add(new Anomaly
+        {
+            CloudServiceId = service.Id,
+            AnomalyType = anomalyType,
+            Severity = severity,
+            AiConfidence = Math.Min(99m, 70m + (currentValue - threshold)),
+            Description = $"{anomalyType}: peak {currentValue:F1} (threshold {threshold:F0})",
+            DetectedAt = DateTime.UtcNow,
+        });
+    }
+
     private static List<Anomaly> DetectAnomalies(
         CloudService service,
         Metric latest,
-        List<Metric> historical)
+        List<Metric> historical,
+        bool useCpu = false,
+        bool latencyMode = false,
+        bool errorMode = false)
     {
         var anomalies = new List<Anomaly>();
 
-        CheckThreshold(anomalies, service, "High CPU Usage",
-            latest.CpuUsage, historical.Select(m => m.CpuUsage).ToList(),
-            absoluteThreshold: 85, deviationMultiplier: 2.5m);
+        if (useCpu)
+        {
+            CheckThreshold(anomalies, service, "High CPU Usage",
+                latest.CpuUsage ?? latest.Value, historical.Select(m => m.CpuUsage ?? m.Value).ToList(),
+                absoluteThreshold: 85, deviationMultiplier: 2.5m);
+            return anomalies;
+        }
+
+        if (latencyMode)
+        {
+            CheckThreshold(anomalies, service, "Latency Spike",
+                latest.LatencyMs, historical.Select(m => m.LatencyMs).ToList(),
+                absoluteThreshold: 500, deviationMultiplier: 3m);
+            return anomalies;
+        }
+
+        if (errorMode)
+        {
+            CheckThreshold(anomalies, service, "Error Rate Surge",
+                latest.ErrorRate, historical.Select(m => m.ErrorRate).ToList(),
+                absoluteThreshold: 5, deviationMultiplier: 2m);
+            return anomalies;
+        }
 
         CheckThreshold(anomalies, service, "High Memory Usage",
             latest.MemoryUsage, historical.Select(m => m.MemoryUsage).ToList(),
             absoluteThreshold: 88, deviationMultiplier: 2.5m);
-
-        CheckThreshold(anomalies, service, "Latency Spike",
-            latest.LatencyMs, historical.Select(m => m.LatencyMs).ToList(),
-            absoluteThreshold: 500, deviationMultiplier: 3m);
-
-        CheckThreshold(anomalies, service, "Error Rate Surge",
-            latest.ErrorRate, historical.Select(m => m.ErrorRate).ToList(),
-            absoluteThreshold: 5, deviationMultiplier: 2m);
 
         return anomalies;
     }
@@ -112,13 +220,29 @@ public class AnomalyDetectionEngine(
     {
         if (currentValue is null) return;
 
+        var exceedsAbsolute = currentValue.Value >= absoluteThreshold;
+
         var validValues = historicalValues.Where(v => v.HasValue).Select(v => v!.Value).ToList();
-        if (validValues.Count < 2) return;
+        if (validValues.Count < 2)
+        {
+            if (exceedsAbsolute)
+            {
+                anomalies.Add(new Anomaly
+                {
+                    CloudServiceId = service.Id,
+                    AnomalyType = anomalyType,
+                    Severity = currentValue.Value >= absoluteThreshold + 10 ? Severity.Critical : Severity.Warning,
+                    AiConfidence = Math.Min(99m, 75m + (currentValue.Value - absoluteThreshold) / 2m),
+                    Description = $"{anomalyType}: current {currentValue.Value:F1} exceeds threshold {absoluteThreshold:F0}",
+                    DetectedAt = DateTime.UtcNow,
+                });
+            }
+            return;
+        }
 
         var mean = validValues.Average();
         var stdDev = CalculateStdDev(validValues, mean);
 
-        var exceedsAbsolute = currentValue.Value >= absoluteThreshold;
         var exceedsStatistical = stdDev > 0 && currentValue.Value > mean + (deviationMultiplier * stdDev);
 
         if (!exceedsAbsolute && !exceedsStatistical) return;

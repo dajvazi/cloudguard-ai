@@ -91,7 +91,17 @@ function metricIcon(name: string | null) {
 }
 
 function sortMetrics(metrics: Metric[]): Metric[] {
-  return [...metrics].sort((a, b) => {
+  const latestByName = new Map<string, Metric>()
+  for (const m of metrics) {
+    const name = m.metricName ?? 'Unknown'
+    const existing = latestByName.get(name)
+    const value = m.value ?? 0
+    const existingValue = existing?.value ?? 0
+    if (!existing || value >= existingValue)
+      latestByName.set(name, m)
+  }
+
+  return [...latestByName.values()].sort((a, b) => {
     const ai = PRIORITY_METRICS.indexOf(a.metricName ?? '')
     const bi = PRIORITY_METRICS.indexOf(b.metricName ?? '')
     return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi)

@@ -6,6 +6,7 @@ public interface ISelfHealingOrchestrator
 {
     Task<SelfHealingResult> TriggerAsync(int serviceId, CancellationToken cancellationToken = default);
     Task<SelfHealingResult> TriggerFromAnomalyAsync(int anomalyId, CancellationToken cancellationToken = default);
+    Task<SelfHealingResult> TriggerFromIncidentAsync(int incidentId, CancellationToken cancellationToken = default);
 }
 
 public record SelfHealingResult(
@@ -14,4 +15,8 @@ public record SelfHealingResult(
     int? AnomalyId,
     int? IncidentId,
     int? RecoveryActionId,
-    AiAnalysisResult? AiAnalysis);
+    AiAnalysisResult? AiAnalysis,
+    string? RunbookId = null,
+    string? SsmCommandId = null,
+    string? ExecutionOutput = null,
+    bool ExecutedViaSsm = false);

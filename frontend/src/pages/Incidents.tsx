@@ -1,18 +1,22 @@
 import { useEffect, useState, useCallback } from 'react'
-import { AlertTriangle, RefreshCw, Sparkles, Zap } from 'lucide-react'
+import { AlertTriangle, RefreshCw, Sparkles } from 'lucide-react'
 import { StatusBadge } from '../components/StatusBadge'
+import { DeleteAllButton } from '../components/DeleteAllButton'
+import { SelfHealingBanner } from '../components/SelfHealingBanner'
 import {
   fetchAllIncidents,
-  triggerSelfHealing,
+  triggerSelfHealingFromIncident,
+  purgeIncidents,
   type Incident,
   type SelfHealingResult,
 } from '../api/client'
 import './Incidents.css'
+import '../components/SelfHealingBanner.css'
 
 export function Incidents() {
   const [incidents, setIncidents] = useState<Incident[]>([])
   const [loading, setLoading] = useState(true)
-  const [healingServiceId, setHealingServiceId] = useState<number | null>(null)
+  const [healingIncidentId, setHealingIncidentId] = useState<number | null>(null)
   const [healResult, setHealResult] = useState<SelfHealingResult | null>(null)
 
   const load = useCallback(async () => {
@@ -22,17 +26,28 @@ export function Incidents() {
 
   useEffect(() => { load() }, [load])
 
-  const handleHeal = async (serviceId: number) => {
-    setHealingServiceId(serviceId)
+  const handleHeal = async (incidentId: number) => {
+    setHealingIncidentId(incidentId)
     setHealResult(null)
     try {
-      const result = await triggerSelfHealing(serviceId)
+      const result = await triggerSelfHealingFromIncident(incidentId)
       setHealResult(result)
       await load()
     } catch {
-      setHealResult({ success: false, message: 'Self-healing failed', anomalyId: null, incidentId: null, recoveryActionId: null, aiAnalysis: null })
+      setHealResult({
+        success: false,
+        message: 'Self-healing failed',
+        anomalyId: null,
+        incidentId: null,
+        recoveryActionId: null,
+        runbookId: null,
+        ssmCommandId: null,
+        executionOutput: null,
+        executedViaSsm: false,
+        aiAnalysis: null,
+      })
     }
-    setHealingServiceId(null)
+    setHealingIncidentId(null)
   }
 
   if (loading) return <div className="page-loading">Duke ngarkuar...</div>
@@ -47,22 +62,19 @@ export function Incidents() {
           <h1>Incidents</h1>
           <p>Live incidents detected across the fleet</p>
         </div>
-        <span className="incidents-count">{active.length} active</span>
+        <div className="page-header-actions">
+          <span className="incidents-count">{active.length} active</span>
+          <DeleteAllButton
+            label="Delete All"
+            confirmMessage="Fshi të gjitha incidentet dhe recovery actions e lidhura? Ky veprim nuk kthehet mbrapsht."
+            onDelete={purgeIncidents}
+            onSuccess={() => load()}
+          />
+        </div>
       </header>
 
       {healResult && (
-        <div className={`heal-banner heal-banner--${healResult.success ? 'success' : 'error'}`}>
-          <Zap size={16} />
-          <div className="heal-banner-text">
-            <strong>{healResult.success ? 'Recovery Complete' : 'Recovery Failed'}</strong>
-            <span>{healResult.message}</span>
-            {healResult.aiAnalysis && (
-              <span className="heal-banner-detail">
-                {healResult.aiAnalysis.actionType}: {healResult.aiAnalysis.recommendedAction}
-              </span>
-            )}
-          </div>
-        </div>
+        <SelfHealingBanner result={healResult} onClose={() => setHealResult(null)} />
       )}
 
       {incidents.length === 0 ? (
@@ -97,15 +109,15 @@ export function Incidents() {
                   <td>
                     <button
                       className="btn-heal-sm"
-                      onClick={() => handleHeal(inc.cloudServiceId)}
-                      disabled={healingServiceId !== null}
+                      onClick={() => handleHeal(inc.id)}
+                      disabled={healingIncidentId !== null}
                     >
-                      {healingServiceId === inc.cloudServiceId ? (
+                      {healingIncidentId === inc.id ? (
                         <RefreshCw size={12} className="spinner" />
                       ) : (
                         <Sparkles size={12} />
                       )}
-                      <span>Heal</span>
+                      <span>Self-Heal</span>
                     </button>
                   </td>
                 </tr>

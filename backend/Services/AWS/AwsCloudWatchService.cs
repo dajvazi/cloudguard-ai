@@ -10,6 +10,7 @@ namespace CloudGuard.Api.Services.AWS;
 public class AwsCloudWatchService(
     IAmazonCloudWatch cloudWatch,
     CloudGuardDbContext dbContext,
+    IAwsImportEvaluator importEvaluator,
     ILogger<AwsCloudWatchService> logger) : IAwsCloudWatchService
 {
     public async Task<bool> TestConnectionAsync(CancellationToken ct = default)
@@ -34,21 +35,33 @@ public class AwsCloudWatchService(
 
         try
         {
-            // 1. Fetch alarms
-            var alarmsResponse = await cloudWatch.DescribeAlarmsAsync(new DescribeAlarmsRequest(), ct);
-            foreach (var alarm in alarmsResponse.MetricAlarms)
+            // 1. Fetch alarms (optional — import continues if denied)
+            try
             {
-                alarms.Add(new AwsAlarmDto(
-                    AlarmName: alarm.AlarmName,
-                    Namespace: alarm.Namespace,
-                    MetricName: alarm.MetricName,
-                    StateValue: alarm.StateValue.Value,
-                    StateReason: alarm.StateReason,
-                    Threshold: (decimal)alarm.Threshold,
-                    ComparisonOperator: alarm.ComparisonOperator.Value,
-                    StateUpdatedAt: alarm.StateUpdatedTimestamp));
+                var alarmsResponse = await cloudWatch.DescribeAlarmsAsync(new DescribeAlarmsRequest(), ct);
+                foreach (var alarm in alarmsResponse.MetricAlarms)
+                {
+                    var instanceDim = alarm.Dimensions?
+                        .FirstOrDefault(d => string.Equals(d.Name, "InstanceId", StringComparison.OrdinalIgnoreCase));
 
-                discoveredServices.Add($"{alarm.Namespace}/{alarm.MetricName}");
+                    alarms.Add(new AwsAlarmDto(
+                        AlarmName: alarm.AlarmName,
+                        Namespace: alarm.Namespace,
+                        MetricName: alarm.MetricName,
+                        StateValue: alarm.StateValue.Value,
+                        StateReason: alarm.StateReason,
+                        Threshold: (decimal)alarm.Threshold,
+                        ComparisonOperator: alarm.ComparisonOperator.Value,
+                        StateUpdatedAt: alarm.StateUpdatedTimestamp,
+                        InstanceId: instanceDim?.Value));
+
+                    discoveredServices.Add(instanceDim?.Value ?? $"{alarm.Namespace}/{alarm.MetricName}");
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex,
+                    "Could not fetch CloudWatch alarms (missing cloudwatch:DescribeAlarms?). Continuing with metrics only.");
             }
 
             // 2. Fetch metric data
@@ -58,82 +71,57 @@ public class AwsCloudWatchService(
 
             var endTime = DateTime.UtcNow;
             var startTime = endTime.AddMinutes(-request.PeriodMinutes);
+            string? lastAwsError = null;
 
             foreach (var ns in namespaces)
             {
-                var listResponse = await cloudWatch.ListMetricsAsync(new ListMetricsRequest { Namespace = ns }, ct);
-
-                var metricQueries = new List<MetricDataQuery>();
-                var metricMap = new Dictionary<string, (string MetricName, string? InstanceId)>();
-                int queryIdx = 0;
-
-                foreach (var metric in listResponse.Metrics.Take(20))
+                try
                 {
-                    var id = $"m{queryIdx++}";
-                    var instanceDim = metric.Dimensions.FirstOrDefault(d => d.Name == "InstanceId")
-                                   ?? metric.Dimensions.FirstOrDefault(d => d.Name == "FunctionName")
-                                   ?? metric.Dimensions.FirstOrDefault(d => d.Name == "DBInstanceIdentifier")
-                                   ?? metric.Dimensions.FirstOrDefault(d => d.Name == "ServiceName");
-
-                    metricQueries.Add(new MetricDataQuery
-                    {
-                        Id = id,
-                        MetricStat = new MetricStat
-                        {
-                            Metric = metric,
-                            Period = 300,
-                            Stat = "Average",
-                        },
-                    });
-
-                    metricMap[id] = (metric.MetricName, instanceDim?.Value);
-                    discoveredServices.Add(instanceDim?.Value ?? $"{ns}/{metric.MetricName}");
+                    await FetchNamespaceMetricsAsync(ns, startTime, endTime, metrics, discoveredServices, ct);
                 }
-
-                if (metricQueries.Count == 0) continue;
-
-                var dataResponse = await cloudWatch.GetMetricDataAsync(new GetMetricDataRequest
+                catch (Exception ex)
                 {
-                    StartTime = startTime,
-                    EndTime = endTime,
-                    MetricDataQueries = metricQueries,
-                }, ct);
-
-                foreach (var result in dataResponse.MetricDataResults)
-                {
-                    if (result.Values.Count == 0) continue;
-
-                    var entry = metricMap.GetValueOrDefault(result.Id);
-                    var metricName = entry.MetricName;
-                    var instanceId = entry.InstanceId;
-
-                    var values = result.Values.Select(v => (decimal)v).ToList();
-                    var timestamps = result.Timestamps;
-
-                    metrics.Add(new AwsMetricDataDto(
-                        Namespace: ns,
-                        MetricName: metricName ?? result.Label ?? "Unknown",
-                        InstanceId: instanceId,
-                        Average: values.Count > 0 ? Math.Round(values.Average(), 2) : 0,
-                        Maximum: values.Count > 0 ? Math.Round(values.Max(), 2) : 0,
-                        Minimum: values.Count > 0 ? Math.Round(values.Min(), 2) : 0,
-                        Timestamp: timestamps.Count > 0 ? timestamps[0] : DateTime.UtcNow));
+                    lastAwsError = ex.Message;
+                    logger.LogWarning(ex, "Could not fetch metrics for namespace {Namespace}", ns);
                 }
+            }
+
+            if (metrics.Count == 0)
+            {
+                var hint = lastAwsError?.Contains("permissions boundary", StringComparison.OrdinalIgnoreCase) == true
+                    ? "Permissions BOUNDARY po bllokon CloudWatch. IAM → user cloudguard-monitor-user → Permissions boundary → shto cloudwatch:ListMetrics dhe GetMetricData."
+                    : "Kontrollo IAM: cloudwatch:ListMetrics, cloudwatch:GetMetricData.";
+
+                return new AwsImportResult(
+                    Success: false,
+                    Message: $"No metrics imported. {hint} {(lastAwsError is not null ? $"AWS: {lastAwsError}" : "")}".Trim(),
+                    AlarmsImported: alarms.Count,
+                    MetricsImported: 0,
+                    ServicesDiscovered: 0,
+                    AnomaliesCreated: 0,
+                    IncidentsCreated: 0,
+                    Alarms: alarms,
+                    Metrics: []);
             }
 
             // 3. Persist to DB: overwrite old AWS-imported data
             await PersistToDatabase(metrics, ct);
 
+            // 4. Evaluate alarms + metrics → anomalies & incidents
+            var evaluation = await importEvaluator.EvaluateAsync(alarms, ct);
+
             logger.LogInformation(
-                "AWS import complete: {Alarms} alarms, {Metrics} metrics, {Services} services",
-                alarms.Count, metrics.Count, discoveredServices.Count);
+                "AWS import complete: {Alarms} alarms, {Metrics} metrics, {Services} services, {Incidents} incidents",
+                alarms.Count, metrics.Count, discoveredServices.Count, evaluation.IncidentsCreated);
 
             return new AwsImportResult(
                 Success: true,
-                Message: $"Imported {alarms.Count} alarms, {metrics.Count} metrics from {discoveredServices.Count} services",
+                Message: $"Imported {alarms.Count} alarms, {metrics.Count} metric points from {discoveredServices.Count} services. Created {evaluation.IncidentsCreated} incidents.",
                 AlarmsImported: alarms.Count,
                 MetricsImported: metrics.Count,
                 ServicesDiscovered: discoveredServices.Count,
+                AnomaliesCreated: evaluation.AnomaliesCreated,
+                IncidentsCreated: evaluation.IncidentsCreated,
                 Alarms: alarms,
                 Metrics: metrics);
         }
@@ -146,8 +134,84 @@ public class AwsCloudWatchService(
                 AlarmsImported: 0,
                 MetricsImported: 0,
                 ServicesDiscovered: 0,
+                AnomaliesCreated: 0,
+                IncidentsCreated: 0,
                 Alarms: [],
                 Metrics: []);
+        }
+    }
+
+    private async Task FetchNamespaceMetricsAsync(
+        string ns,
+        DateTime startTime,
+        DateTime endTime,
+        List<AwsMetricDataDto> metrics,
+        HashSet<string> discoveredServices,
+        CancellationToken ct)
+    {
+        var listResponse = await cloudWatch.ListMetricsAsync(new ListMetricsRequest { Namespace = ns }, ct);
+
+        var metricQueries = new List<MetricDataQuery>();
+        var metricMap = new Dictionary<string, (string MetricName, string? InstanceId)>();
+        int queryIdx = 0;
+
+        foreach (var metric in listResponse.Metrics.Take(20))
+        {
+            var id = $"m{queryIdx++}";
+            var instanceDim = metric.Dimensions.FirstOrDefault(d => d.Name == "InstanceId")
+                           ?? metric.Dimensions.FirstOrDefault(d => d.Name == "FunctionName")
+                           ?? metric.Dimensions.FirstOrDefault(d => d.Name == "DBInstanceIdentifier")
+                           ?? metric.Dimensions.FirstOrDefault(d => d.Name == "ServiceName");
+
+            metricQueries.Add(new MetricDataQuery
+            {
+                Id = id,
+                MetricStat = new MetricStat
+                {
+                    Metric = metric,
+                    Period = 300,
+                    Stat = "Average",
+                },
+            });
+
+            metricMap[id] = (metric.MetricName, instanceDim?.Value);
+            discoveredServices.Add(instanceDim?.Value ?? $"{ns}/{metric.MetricName}");
+        }
+
+        if (metricQueries.Count == 0) return;
+
+        var dataResponse = await cloudWatch.GetMetricDataAsync(new GetMetricDataRequest
+        {
+            StartTime = startTime,
+            EndTime = endTime,
+            MetricDataQueries = metricQueries,
+        }, ct);
+
+        foreach (var result in dataResponse.MetricDataResults)
+        {
+            if (result.Values.Count == 0) continue;
+
+            var entry = metricMap.GetValueOrDefault(result.Id);
+            var metricName = entry.MetricName;
+            var instanceId = entry.InstanceId;
+
+            var values = result.Values.Select(v => (decimal)v).ToList();
+            var timestamps = result.Timestamps;
+
+            for (var i = 0; i < values.Count; i++)
+            {
+                var value = values[i];
+                var ts = i < timestamps.Count ? timestamps[i] : DateTime.UtcNow;
+
+                metrics.Add(new AwsMetricDataDto(
+                    Namespace: ns,
+                    MetricName: metricName ?? result.Label ?? "Unknown",
+                    InstanceId: instanceId,
+                    Average: Math.Round(value, 2),
+                    Maximum: Math.Round(value, 2),
+                    Minimum: Math.Round(value, 2),
+                    Timestamp: ts));
+            }
         }
     }
 
@@ -194,6 +258,15 @@ public class AwsCloudWatchService(
                 MapSpecificFields(metric, m);
                 service.Metrics.Add(metric);
             }
+
+            var peakCpu = AwsMetricHealthRules.PeakForRule(
+                service,
+                AwsMetricHealthRules.All[0]);
+
+            if (peakCpu >= 80m)
+                service.Status = ServiceStatus.Critical;
+            else if (peakCpu >= 60m)
+                service.Status = ServiceStatus.Warning;
 
             dbContext.CloudServices.Add(service);
         }

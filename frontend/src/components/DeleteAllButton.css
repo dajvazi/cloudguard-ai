@@ -1,0 +1,67 @@
+.delete-all-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.delete-all-wrap--compact {
+  align-items: flex-start;
+}
+
+.btn-delete-all {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: var(--red-bg);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  border-radius: var(--radius);
+  color: var(--red-text);
+  font-size: 12px;
+  font-weight: 600;
+  transition: all 0.15s;
+}
+
+.btn-delete-all:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: var(--red);
+  color: #fca5a5;
+}
+
+.btn-delete-all:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.delete-all-feedback {
+  font-size: 11px;
+  max-width: 280px;
+  text-align: right;
+}
+
+.delete-all-wrap--compact .delete-all-feedback {
+  text-align: left;
+}
+
+.delete-all-feedback--success {
+  color: var(--green-text);
+}
+
+.delete-all-feedback--error {
+  color: var(--red-text);
+}
+
+.delete-actions-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.page-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}

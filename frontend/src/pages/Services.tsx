@@ -1,15 +1,25 @@
 import { useEffect, useState, useMemo } from 'react'
-import { Upload, Cloud, ChevronDown, ChevronUp } from 'lucide-react'
+import { Upload, Cloud, ChevronDown, ChevronUp, RefreshCw, Sparkles } from 'lucide-react'
 import { StatusBadge } from '../components/StatusBadge'
+import { SelfHealingBanner } from '../components/SelfHealingBanner'
 import { TerraformUploadDialog } from '../components/TerraformUploadDialog'
 import { CloudImportDialog } from '../components/CloudImportDialog'
 import { ServiceMetricsPanel } from '../components/ServiceMetricsPanel'
+import { DeleteAllButton } from '../components/DeleteAllButton'
 import {
   fetchServices,
   fetchMetrics,
+  purgeMetrics,
+  purgeServices,
+  purgeAws,
+  purgeTerraform,
+  reevaluateAwsHealth,
+  triggerSelfHealing,
   type CloudService,
   type Metric,
+  type SelfHealingResult,
 } from '../api/client'
+import '../components/SelfHealingBanner.css'
 import './Services.css'
 
 export function Services() {
@@ -19,6 +29,10 @@ export function Services() {
   const [terraformOpen, setTerraformOpen] = useState(false)
   const [cloudOpen, setCloudOpen] = useState(false)
   const [expandedId, setExpandedId] = useState<number | null>(null)
+  const [evaluating, setEvaluating] = useState(false)
+  const [evalMessage, setEvalMessage] = useState<string | null>(null)
+  const [healingServiceId, setHealingServiceId] = useState<number | null>(null)
+  const [healResult, setHealResult] = useState<SelfHealingResult | null>(null)
 
   const metricsByService = useMemo(() => {
     const map: Record<number, Metric[]> = {}
@@ -40,6 +54,48 @@ export function Services() {
   }
 
   useEffect(() => { load() }, [])
+
+  async function handleReevaluate() {
+    setEvaluating(true)
+    setEvalMessage(null)
+    try {
+      const result = await reevaluateAwsHealth()
+      setEvalMessage(
+        `U krijuan ${result.incidentsCreated} incidente, ${result.anomaliesCreated} anomalí`
+      )
+      await load()
+    } catch {
+      setEvalMessage('Vlerësimi dështoi')
+    }
+    setEvaluating(false)
+  }
+
+  async function handleHeal(serviceId: number) {
+    setHealingServiceId(serviceId)
+    setHealResult(null)
+    try {
+      const result = await triggerSelfHealing(serviceId)
+      setHealResult(result)
+      await load()
+    } catch {
+      setHealResult({
+        success: false,
+        message: 'Self-healing failed',
+        anomalyId: null,
+        incidentId: null,
+        recoveryActionId: null,
+        runbookId: null,
+        ssmCommandId: null,
+        executionOutput: null,
+        executedViaSsm: false,
+        aiAnalysis: null,
+      })
+    }
+    setHealingServiceId(null)
+  }
+
+  const needsHeal = (status: string) =>
+    status === 'Critical' || status === 'Warning' || status === 'Recovering'
 
   const servicesWithMetrics = services.filter((s) => (metricsByService[s.id]?.length ?? 0) > 0)
   const servicesWithoutMetrics = services.filter((s) => (metricsByService[s.id]?.length ?? 0) === 0)
@@ -64,6 +120,54 @@ export function Services() {
           </button>
         </div>
       </header>
+
+      <section className="delete-actions-bar">
+        <span className="delete-actions-label">Veprime:</span>
+        <div className="delete-actions-group">
+          <button
+            type="button"
+            className="btn-reevaluate"
+            onClick={handleReevaluate}
+            disabled={evaluating}
+          >
+            <RefreshCw size={14} className={evaluating ? 'spinner' : ''} />
+            Kontrollo Incidentet
+          </button>
+          <DeleteAllButton
+            label="Metrics"
+            variant="compact"
+            confirmMessage="Fshi të gjitha metrikat?"
+            onDelete={purgeMetrics}
+            onSuccess={() => load()}
+          />
+          <DeleteAllButton
+            label="AWS"
+            variant="compact"
+            confirmMessage="Fshi të gjitha AWS services dhe metrikat e tyre?"
+            onDelete={purgeAws}
+            onSuccess={() => load()}
+          />
+          <DeleteAllButton
+            label="Terraform"
+            variant="compact"
+            confirmMessage="Fshi të gjitha të dhënat Terraform (uploads, services, resources)?"
+            onDelete={purgeTerraform}
+            onSuccess={() => load()}
+          />
+          <DeleteAllButton
+            label="All Services"
+            variant="compact"
+            confirmMessage="Fshi TË GJITHA services, metrikat, anomalitë dhe incidentet? Ky veprim është shumë destruktiv."
+            onDelete={purgeServices}
+            onSuccess={() => load()}
+          />
+        </div>
+        {evalMessage && <span className="reevaluate-msg">{evalMessage}</span>}
+      </section>
+
+      {healResult && (
+        <SelfHealingBanner result={healResult} onClose={() => setHealResult(null)} />
+      )}
 
       {services.length === 0 ? (
         <div className="empty-state-large">
@@ -114,6 +218,23 @@ export function Services() {
                 )}
 
                 <ServiceMetricsPanel metrics={svcMetrics} compact={!expanded} />
+
+                {needsHeal(svc.status) && (
+                  <div className="service-heal-row">
+                    <button
+                      type="button"
+                      className="btn-heal"
+                      onClick={(e) => { e.stopPropagation(); handleHeal(svc.id) }}
+                      disabled={healingServiceId !== null}
+                    >
+                      {healingServiceId === svc.id ? (
+                        <><RefreshCw size={13} className="spinner" /> Healing...</>
+                      ) : (
+                        <><Sparkles size={13} /> Self-Heal via SSM</>
+                      )}
+                    </button>
+                  </div>
+                )}
 
                 {expanded && (
                   <div className="metrics-detail-table-wrap">

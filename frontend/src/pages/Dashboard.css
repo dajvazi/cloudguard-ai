@@ -366,6 +366,18 @@
   margin-top: 2px;
 }
 
+.toast-output {
+  margin-top: 8px;
+  padding: 8px 10px;
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 4px;
+  font-size: 10px;
+  font-family: var(--font-mono);
+  max-height: 120px;
+  overflow: auto;
+  white-space: pre-wrap;
+}
+
 .toast-close {
   background: none;
   border: none;

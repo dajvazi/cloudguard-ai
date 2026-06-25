@@ -9,6 +9,7 @@ import {
   Radio,
   Activity,
   Bell,
+  AlertTriangle,
 } from 'lucide-react'
 import {
   testAwsConnection,
@@ -72,13 +73,16 @@ export function CloudImportDialog({ open, onClose, onSuccess }: CloudImportDialo
       setProgress(50)
       const res = await importAwsCloudWatch(region, namespace || undefined, period)
       setProgress(100)
-      setResult(res)
 
-      if (res.success) {
-        setTimeout(() => {
-          onSuccess(res)
-        }, 2000)
+      if (!res.success) {
+        setError(res.message)
+        return
       }
+
+      setResult(res)
+      setTimeout(() => {
+        onSuccess(res)
+      }, 2000)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Import failed')
     }
@@ -219,6 +223,18 @@ export function CloudImportDialog({ open, onClose, onSuccess }: CloudImportDialo
                   <Cloud size={14} />
                   <span>{result.servicesDiscovered} Services</span>
                 </div>
+                {result.incidentsCreated > 0 && (
+                  <div className="result-stat result-stat--alert">
+                    <AlertTriangle size={14} />
+                    <span>{result.incidentsCreated} Incidents</span>
+                  </div>
+                )}
+                {result.anomaliesCreated > 0 && (
+                  <div className="result-stat">
+                    <Activity size={14} />
+                    <span>{result.anomaliesCreated} Anomalies</span>
+                  </div>
+                )}
               </div>
               {result.alarms.length > 0 && (
                 <div className="result-preview">

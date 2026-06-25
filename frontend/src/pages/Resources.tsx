@@ -1,7 +1,8 @@
 import { useEffect, useState, useMemo } from 'react'
 import { StatusBadge } from '../components/StatusBadge'
+import { DeleteAllButton } from '../components/DeleteAllButton'
 import { ServiceMetricsPanel } from '../components/ServiceMetricsPanel'
-import { fetchResources, fetchServices, fetchMetrics, type Resource, type Metric } from '../api/client'
+import { fetchResources, fetchServices, fetchMetrics, purgeResources, type Resource, type Metric } from '../api/client'
 import './Resources.css'
 
 export function Resources() {
@@ -9,7 +10,8 @@ export function Resources() {
   const [metricsByName, setMetricsByName] = useState<Record<string, Metric[]>>({})
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
+  function load() {
+    setLoading(true)
     Promise.allSettled([fetchResources(), fetchServices(), fetchMetrics()])
       .then(([res, svc, met]) => {
         if (res.status === 'fulfilled') setResources(res.value)
@@ -28,7 +30,9 @@ export function Resources() {
         }
       })
       .finally(() => setLoading(false))
-  }, [])
+  }
+
+  useEffect(() => { load() }, [])
 
   const withMetrics = useMemo(
     () => resources.filter((r) => (metricsByName[r.resourceName]?.length ?? 0) > 0),
@@ -44,7 +48,15 @@ export function Resources() {
           <h1>Resources</h1>
           <p>Infrastructure resources me metrikat e tyre</p>
         </div>
-        <span className="resource-count">{resources.length} total</span>
+        <div className="page-header-actions">
+          <span className="resource-count">{resources.length} total</span>
+          <DeleteAllButton
+            label="Delete All"
+            confirmMessage="Fshi të gjitha resources (Terraform inventory)? Ky veprim nuk kthehet mbrapsht."
+            onDelete={purgeResources}
+            onSuccess={() => load()}
+          />
+        </div>
       </header>
 
       {resources.length === 0 ? (

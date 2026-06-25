@@ -61,7 +61,18 @@ export function Dashboard() {
       setHealResult(result)
       await load(true)
     } catch {
-      setHealResult({ success: false, message: 'Self-healing failed', anomalyId: null, incidentId: null, recoveryActionId: null, aiAnalysis: null })
+      setHealResult({
+        success: false,
+        message: 'Self-healing failed',
+        anomalyId: null,
+        incidentId: null,
+        recoveryActionId: null,
+        runbookId: null,
+        ssmCommandId: null,
+        executionOutput: null,
+        executedViaSsm: false,
+        aiAnalysis: null,
+      })
     }
     setHealingId(null)
   }
@@ -112,6 +123,15 @@ export function Dashboard() {
               <span className="toast-detail">
                 Action: {healResult.aiAnalysis.actionType} · {healResult.aiAnalysis.rootCause}
               </span>
+            )}
+            {healResult.executedViaSsm && healResult.runbookId && (
+              <span className="toast-detail">
+                SSM runbook: {healResult.runbookId}
+                {healResult.ssmCommandId && ` · ${healResult.ssmCommandId}`}
+              </span>
+            )}
+            {healResult.executionOutput && (
+              <pre className="toast-output">{healResult.executionOutput.trim()}</pre>
             )}
           </div>
           <button className="toast-close" onClick={() => setHealResult(null)}>

@@ -115,6 +115,10 @@ export interface SelfHealingResult {
   anomalyId: number | null
   incidentId: number | null
   recoveryActionId: number | null
+  runbookId: string | null
+  ssmCommandId: string | null
+  executionOutput: string | null
+  executedViaSsm: boolean
   aiAnalysis: {
     rootCause: string
     recommendedAction: string
@@ -123,20 +127,26 @@ export interface SelfHealingResult {
   } | null
 }
 
+async function postSelfHealing(url: string): Promise<SelfHealingResult> {
+  const response = await fetch(url, { method: 'POST' })
+  const body = (await response.json().catch(() => null)) as SelfHealingResult | null
+
+  if (body && typeof body.message === 'string')
+    return body
+
+  throw new Error(`Self-healing error: ${response.status}`)
+}
+
 export function triggerSelfHealing(serviceId: number): Promise<SelfHealingResult> {
-  return fetch(`/api/self-healing/trigger/${serviceId}`, { method: 'POST' })
-    .then(r => {
-      if (!r.ok) throw new Error(`Self-healing error: ${r.status}`)
-      return r.json() as Promise<SelfHealingResult>
-    })
+  return postSelfHealing(`/api/self-healing/trigger/${serviceId}`)
 }
 
 export function triggerSelfHealingFromAnomaly(anomalyId: number): Promise<SelfHealingResult> {
-  return fetch(`/api/self-healing/trigger/anomaly/${anomalyId}`, { method: 'POST' })
-    .then(r => {
-      if (!r.ok) throw new Error(`Self-healing error: ${r.status}`)
-      return r.json() as Promise<SelfHealingResult>
-    })
+  return postSelfHealing(`/api/self-healing/trigger/anomaly/${anomalyId}`)
+}
+
+export function triggerSelfHealingFromIncident(incidentId: number): Promise<SelfHealingResult> {
+  return postSelfHealing(`/api/self-healing/trigger/incident/${incidentId}`)
 }
 
 // AWS CloudWatch
@@ -167,6 +177,8 @@ export interface AwsImportResult {
   alarmsImported: number
   metricsImported: number
   servicesDiscovered: number
+  anomaliesCreated: number
+  incidentsCreated: number
   alarms: AwsAlarm[]
   metrics: AwsMetricData[]
 }
@@ -180,13 +192,60 @@ export function testAwsConnection(): Promise<AwsConnectionResult> {
   return getJson<AwsConnectionResult>('/api/aws/test-connection')
 }
 
-export function importAwsCloudWatch(region: string, namespace?: string, periodMinutes = 60): Promise<AwsImportResult> {
-  return fetch('/api/aws/import', {
+export function reevaluateAwsHealth(): Promise<{ anomaliesCreated: number; incidentsCreated: number }> {
+  return fetch('/api/aws/reevaluate', { method: 'POST' })
+    .then(r => {
+      if (!r.ok) throw new Error(`Reevaluate error: ${r.status}`)
+      return r.json() as Promise<{ anomaliesCreated: number; incidentsCreated: number }>
+    })
+}
+
+export async function importAwsCloudWatch(region: string, namespace?: string, periodMinutes = 60): Promise<AwsImportResult> {
+  const response = await fetch('/api/aws/import', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ region, namespace: namespace || null, periodMinutes }),
-  }).then(r => {
-    if (!r.ok) throw new Error(`AWS import error: ${r.status}`)
-    return r.json() as Promise<AwsImportResult>
   })
+  const body = (await response.json().catch(() => null)) as AwsImportResult | null
+  if (body && typeof body.message === 'string')
+    return body
+  throw new Error(`AWS import error: ${response.status}`)
 }
+
+// Admin purge
+export interface PurgeResult {
+  module: string
+  deletedCount: number
+  message: string
+}
+
+export type PurgeModule =
+  | 'metrics'
+  | 'anomalies'
+  | 'recovery-actions'
+  | 'incidents'
+  | 'services'
+  | 'resources'
+  | 'terraform'
+  | 'aws'
+
+async function deleteJson<T>(url: string): Promise<T> {
+  const response = await fetch(url, { method: 'DELETE' })
+  if (!response.ok) {
+    throw new Error(`API error: ${response.status}`)
+  }
+  return response.json() as Promise<T>
+}
+
+export function purgeModule(module: PurgeModule): Promise<PurgeResult> {
+  return deleteJson<PurgeResult>(`/api/admin/${module}`)
+}
+
+export const purgeMetrics = () => purgeModule('metrics')
+export const purgeAnomalies = () => purgeModule('anomalies')
+export const purgeRecoveryActions = () => purgeModule('recovery-actions')
+export const purgeIncidents = () => purgeModule('incidents')
+export const purgeServices = () => purgeModule('services')
+export const purgeResources = () => purgeModule('resources')
+export const purgeTerraform = () => purgeModule('terraform')
+export const purgeAws = () => purgeModule('aws')
