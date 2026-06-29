@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from 'react'
 import { Upload, Cloud, ChevronDown, ChevronUp, RefreshCw, Sparkles } from 'lucide-react'
 import { StatusBadge } from '../components/StatusBadge'
 import { SelfHealingBanner } from '../components/SelfHealingBanner'
+import { SelfHealingDialog } from '../components/SelfHealingDialog'
 import { TerraformUploadDialog } from '../components/TerraformUploadDialog'
 import { CloudImportDialog } from '../components/CloudImportDialog'
 import { ServiceMetricsPanel } from '../components/ServiceMetricsPanel'
@@ -14,7 +15,6 @@ import {
   purgeAws,
   purgeTerraform,
   reevaluateAwsHealth,
-  triggerSelfHealing,
   type CloudService,
   type Metric,
   type SelfHealingResult,
@@ -31,7 +31,7 @@ export function Services() {
   const [expandedId, setExpandedId] = useState<number | null>(null)
   const [evaluating, setEvaluating] = useState(false)
   const [evalMessage, setEvalMessage] = useState<string | null>(null)
-  const [healingServiceId, setHealingServiceId] = useState<number | null>(null)
+  const [healDialogServiceId, setHealDialogServiceId] = useState<number | null>(null)
   const [healResult, setHealResult] = useState<SelfHealingResult | null>(null)
 
   const metricsByService = useMemo(() => {
@@ -70,28 +70,10 @@ export function Services() {
     setEvaluating(false)
   }
 
-  async function handleHeal(serviceId: number) {
-    setHealingServiceId(serviceId)
-    setHealResult(null)
-    try {
-      const result = await triggerSelfHealing(serviceId)
-      setHealResult(result)
-      await load()
-    } catch {
-      setHealResult({
-        success: false,
-        message: 'Self-healing failed',
-        anomalyId: null,
-        incidentId: null,
-        recoveryActionId: null,
-        runbookId: null,
-        ssmCommandId: null,
-        executionOutput: null,
-        executedViaSsm: false,
-        aiAnalysis: null,
-      })
-    }
-    setHealingServiceId(null)
+  function handleHealComplete(result: SelfHealingResult) {
+    setHealDialogServiceId(null)
+    setHealResult(result)
+    load()
   }
 
   const needsHeal = (status: string) =>
@@ -224,14 +206,9 @@ export function Services() {
                     <button
                       type="button"
                       className="btn-heal"
-                      onClick={(e) => { e.stopPropagation(); handleHeal(svc.id) }}
-                      disabled={healingServiceId !== null}
+                      onClick={(e) => { e.stopPropagation(); setHealDialogServiceId(svc.id) }}
                     >
-                      {healingServiceId === svc.id ? (
-                        <><RefreshCw size={13} className="spinner" /> Healing...</>
-                      ) : (
-                        <><Sparkles size={13} /> Self-Heal via SSM</>
-                      )}
+                      <Sparkles size={13} /> Self-Heal via SSM
                     </button>
                   </div>
                 )}
@@ -300,6 +277,12 @@ export function Services() {
         open={cloudOpen}
         onClose={() => setCloudOpen(false)}
         onSuccess={() => { setCloudOpen(false); load() }}
+      />
+      <SelfHealingDialog
+        open={healDialogServiceId !== null}
+        serviceId={healDialogServiceId}
+        onClose={() => setHealDialogServiceId(null)}
+        onComplete={handleHealComplete}
       />
     </div>
   )

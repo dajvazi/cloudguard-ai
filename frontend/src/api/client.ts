@@ -149,6 +149,35 @@ export function triggerSelfHealingFromIncident(incidentId: number): Promise<Self
   return postSelfHealing(`/api/self-healing/trigger/incident/${incidentId}`)
 }
 
+export interface HealingOption {
+  runbookId: string
+  name: string
+  description: string
+  effect: string
+  recommended: boolean
+}
+
+export interface HealingAnalysis {
+  success: boolean
+  serviceName: string
+  anomalyType: string | null
+  aiAnalysis: {
+    rootCause: string
+    recommendedAction: string
+    actionType: string
+    severity: string
+  } | null
+  options: HealingOption[]
+}
+
+export function analyzeForHealing(serviceId: number): Promise<HealingAnalysis> {
+  return getJson<HealingAnalysis>(`/api/self-healing/analyze/${serviceId}`)
+}
+
+export function executeRunbook(serviceId: number, runbookId: string): Promise<SelfHealingResult> {
+  return postSelfHealing(`/api/self-healing/execute/${serviceId}/${runbookId}`)
+}
+
 // AWS CloudWatch
 export interface AwsAlarm {
   alarmName: string

@@ -470,28 +470,194 @@ public partial class SelfHealingOrchestrator(
 
 
 
-    private string? ResolveInstanceId(CloudService service)
-
+    public async Task<HealingAnalysis> AnalyzeAsync(
+        int serviceId,
+        CancellationToken cancellationToken = default)
     {
+        var service = await db.CloudServices.FirstOrDefaultAsync(s => s.Id == serviceId, cancellationToken);
+        if (service is null)
+            return new HealingAnalysis(false, "Unknown", null, null, []);
 
-        if (Ec2InstanceIdPattern().IsMatch(service.Name))
+        var latestAnomaly = await db.Anomalies
+            .Where(a => a.CloudServiceId == serviceId)
+            .OrderByDescending(a => a.DetectedAt)
+            .FirstOrDefaultAsync(cancellationToken);
 
-            return service.Name;
+        if (latestAnomaly is null)
+            return new HealingAnalysis(false, service.Name, null, null, []);
 
+        var analysis = await aiService.AnalyzeIncidentAsync(
+            service.Name,
+            service.Type,
+            latestAnomaly.AnomalyType ?? "Unknown",
+            latestAnomaly.Description ?? "",
+            cancellationToken);
 
+        var allRunbooks = runbookService.GetAll();
+        var recommended = runbookService.Resolve(
+            latestAnomaly.AnomalyType ?? "",
+            analysis.ActionType,
+            service.SourceKind);
 
-        return configuration["AWS:Ec2InstanceId"]
+        var options = allRunbooks.Select(rb => new HealingOption(
+            RunbookId: rb.Id,
+            Name: rb.Name,
+            Description: rb.Description,
+            Effect: GetRunbookEffect(rb.Id, service.Name),
+            Recommended: rb.Id == recommended?.Id
+        )).ToList();
 
-            ?? Environment.GetEnvironmentVariable("AWS_EC2_INSTANCE_ID");
-
+        return new HealingAnalysis(
+            Success: true,
+            ServiceName: service.Name,
+            AnomalyType: latestAnomaly.AnomalyType,
+            AiAnalysis: analysis,
+            Options: options);
     }
 
+    public async Task<SelfHealingResult> ExecuteRunbookAsync(
+        int serviceId,
+        string runbookId,
+        CancellationToken cancellationToken = default)
+    {
+        var service = await db.CloudServices.FirstOrDefaultAsync(s => s.Id == serviceId, cancellationToken);
+        if (service is null)
+            return Failed($"Service {serviceId} not found");
 
+        var runbook = runbookService.GetById(runbookId);
+        if (runbook is null)
+            return Failed($"Runbook '{runbookId}' not found");
+
+        var latestAnomaly = await db.Anomalies
+            .Where(a => a.CloudServiceId == serviceId)
+            .OrderByDescending(a => a.DetectedAt)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        var analysis = await aiService.AnalyzeIncidentAsync(
+            service.Name,
+            service.Type,
+            latestAnomaly?.AnomalyType ?? "Unknown",
+            latestAnomaly?.Description ?? "",
+            cancellationToken);
+
+        var existingIncident = await FindOpenIncidentAsync(service.Id, cancellationToken);
+
+        Incident incident;
+        if (existingIncident is not null)
+        {
+            incident = existingIncident;
+            incident.Status = IncidentStatus.Investigating;
+            incident.RootCause = analysis.RootCause;
+        }
+        else
+        {
+            incident = new Incident
+            {
+                CloudServiceId = service.Id,
+                Title = $"[Heal] {runbook.Name} on {service.Name}",
+                Severity = analysis.Severity,
+                Status = IncidentStatus.Investigating,
+                RootCause = analysis.RootCause,
+                CreatedAt = DateTime.UtcNow,
+            };
+            db.Incidents.Add(incident);
+        }
+        await db.SaveChangesAsync(cancellationToken);
+
+        var recoveryAction = new RecoveryAction
+        {
+            IncidentId = incident.Id,
+            ActionType = runbook.Name,
+            ActionStatus = RecoveryActionStatus.InProgress,
+            Description = analysis.RecommendedAction,
+            ExecutedAt = DateTime.UtcNow,
+        };
+
+        db.RecoveryActions.Add(recoveryAction);
+        service.Status = ServiceStatus.Recovering;
+        incident.Status = IncidentStatus.Mitigating;
+        await db.SaveChangesAsync(cancellationToken);
+
+        var instanceId = ResolveInstanceId(service);
+
+        if (instanceId is not null && ssmService.IsEnabled)
+        {
+            var ssmResult = await ssmService.ExecuteRunbookAsync(instanceId, runbook.Commands, cancellationToken);
+            recoveryAction.Description =
+                $"{analysis.RecommendedAction}\n\n[SSM {ssmResult.CommandId}]\n{ssmResult.Output}";
+
+            if (!string.IsNullOrWhiteSpace(ssmResult.Error))
+                recoveryAction.Description += $"\n\nSTDERR:\n{ssmResult.Error}";
+
+            if (ssmResult.Success)
+            {
+                recoveryAction.ActionStatus = RecoveryActionStatus.Completed;
+                incident.Status = IncidentStatus.Resolved;
+                incident.ResolvedAt = DateTime.UtcNow;
+                service.Status = ServiceStatus.Healthy;
+            }
+            else
+            {
+                recoveryAction.ActionStatus = RecoveryActionStatus.Failed;
+                incident.Status = IncidentStatus.Open;
+                service.Status = ServiceStatus.Critical;
+            }
+
+            await db.SaveChangesAsync(cancellationToken);
+
+            return new SelfHealingResult(
+                Success: ssmResult.Success,
+                Message: ssmResult.Success
+                    ? $"Runbook '{runbook.Id}' executed on {service.Name}"
+                    : $"Runbook failed: {ssmResult.Error ?? ssmResult.Status}",
+                AnomalyId: latestAnomaly?.Id,
+                IncidentId: incident.Id,
+                RecoveryActionId: recoveryAction.Id,
+                AiAnalysis: analysis,
+                RunbookId: runbook.Id,
+                SsmCommandId: ssmResult.CommandId,
+                ExecutionOutput: ssmResult.Success ? ssmResult.Output : (ssmResult.Error ?? ssmResult.Output),
+                ExecutedViaSsm: true);
+        }
+
+        await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken);
+        recoveryAction.Description += "\n\n[Simulated — SSM disabled or non-AWS service]";
+        recoveryAction.ActionStatus = RecoveryActionStatus.Completed;
+        incident.Status = IncidentStatus.Resolved;
+        incident.ResolvedAt = DateTime.UtcNow;
+        service.Status = ServiceStatus.Healthy;
+        await db.SaveChangesAsync(cancellationToken);
+
+        return new SelfHealingResult(
+            Success: true,
+            Message: $"Runbook '{runbook.Id}' completed (simulated): {service.Name}",
+            AnomalyId: latestAnomaly?.Id,
+            IncidentId: incident.Id,
+            RecoveryActionId: recoveryAction.Id,
+            AiAnalysis: analysis,
+            RunbookId: runbook.Id,
+            ExecutedViaSsm: false);
+    }
+
+    private static string GetRunbookEffect(string runbookId, string serviceName) => runbookId switch
+    {
+        "kill-stress" => $"Kills stress-test processes on {serviceName}. CPU and network load will drop immediately. Safe for production — only targets known load-test binaries.",
+        "clear-temp-disk" => $"Removes temporary load-test files from /tmp on {serviceName}. Frees disk space without affecting application data.",
+        "collect-diagnostics" => $"Gathers a snapshot of CPU, memory, disk, and top processes from {serviceName}. Read-only — makes no changes to the system.",
+        _ => "Executes remediation commands on the target instance.",
+    };
+
+    private string? ResolveInstanceId(CloudService service)
+    {
+        if (Ec2InstanceIdPattern().IsMatch(service.Name))
+            return service.Name;
+
+        return configuration["AWS:Ec2InstanceId"]
+            ?? Environment.GetEnvironmentVariable("AWS_EC2_INSTANCE_ID");
+    }
 
     private static SelfHealingResult Failed(string message) =>
-
         new(false, message, null, null, null, null, null, null, null, false);
-
 }
 
 

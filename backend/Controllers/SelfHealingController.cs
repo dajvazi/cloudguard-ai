@@ -51,4 +51,26 @@ public class SelfHealingController(ISelfHealingOrchestrator orchestrator) : Cont
         var result = await orchestrator.TriggerFromIncidentAsync(incidentId, cancellationToken);
         return ToResponse(result);
     }
+
+    [HttpGet("analyze/{serviceId:int}")]
+    [ProducesResponseType(typeof(HealingAnalysis), StatusCodes.Status200OK)]
+    public async Task<ActionResult<HealingAnalysis>> Analyze(
+        int serviceId,
+        CancellationToken cancellationToken)
+    {
+        var analysis = await orchestrator.AnalyzeAsync(serviceId, cancellationToken);
+        return Ok(analysis);
+    }
+
+    [HttpPost("execute/{serviceId:int}/{runbookId}")]
+    [ProducesResponseType(typeof(SelfHealingResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<SelfHealingResult>> ExecuteRunbook(
+        int serviceId,
+        string runbookId,
+        CancellationToken cancellationToken)
+    {
+        var result = await orchestrator.ExecuteRunbookAsync(serviceId, runbookId, cancellationToken);
+        return ToResponse(result);
+    }
 }

@@ -1,11 +1,11 @@
 import { useEffect, useState, useCallback } from 'react'
-import { AlertTriangle, RefreshCw, Sparkles } from 'lucide-react'
+import { AlertTriangle, Sparkles } from 'lucide-react'
 import { StatusBadge } from '../components/StatusBadge'
 import { DeleteAllButton } from '../components/DeleteAllButton'
 import { SelfHealingBanner } from '../components/SelfHealingBanner'
+import { SelfHealingDialog } from '../components/SelfHealingDialog'
 import {
   fetchAllIncidents,
-  triggerSelfHealingFromIncident,
   purgeIncidents,
   type Incident,
   type SelfHealingResult,
@@ -16,7 +16,7 @@ import '../components/SelfHealingBanner.css'
 export function Incidents() {
   const [incidents, setIncidents] = useState<Incident[]>([])
   const [loading, setLoading] = useState(true)
-  const [healingIncidentId, setHealingIncidentId] = useState<number | null>(null)
+  const [healDialogServiceId, setHealDialogServiceId] = useState<number | null>(null)
   const [healResult, setHealResult] = useState<SelfHealingResult | null>(null)
 
   const load = useCallback(async () => {
@@ -26,28 +26,10 @@ export function Incidents() {
 
   useEffect(() => { load() }, [load])
 
-  const handleHeal = async (incidentId: number) => {
-    setHealingIncidentId(incidentId)
-    setHealResult(null)
-    try {
-      const result = await triggerSelfHealingFromIncident(incidentId)
-      setHealResult(result)
-      await load()
-    } catch {
-      setHealResult({
-        success: false,
-        message: 'Self-healing failed',
-        anomalyId: null,
-        incidentId: null,
-        recoveryActionId: null,
-        runbookId: null,
-        ssmCommandId: null,
-        executionOutput: null,
-        executedViaSsm: false,
-        aiAnalysis: null,
-      })
-    }
-    setHealingIncidentId(null)
+  function handleHealComplete(result: SelfHealingResult) {
+    setHealDialogServiceId(null)
+    setHealResult(result)
+    load()
   }
 
   if (loading) return <div className="page-loading">Duke ngarkuar...</div>
@@ -109,14 +91,9 @@ export function Incidents() {
                   <td>
                     <button
                       className="btn-heal-sm"
-                      onClick={() => handleHeal(inc.id)}
-                      disabled={healingIncidentId !== null}
+                      onClick={() => setHealDialogServiceId(inc.cloudServiceId)}
                     >
-                      {healingIncidentId === inc.id ? (
-                        <RefreshCw size={12} className="spinner" />
-                      ) : (
-                        <Sparkles size={12} />
-                      )}
+                      <Sparkles size={12} />
                       <span>Self-Heal</span>
                     </button>
                   </td>
@@ -137,6 +114,13 @@ export function Incidents() {
           </table>
         </div>
       )}
+
+      <SelfHealingDialog
+        open={healDialogServiceId !== null}
+        serviceId={healDialogServiceId}
+        onClose={() => setHealDialogServiceId(null)}
+        onComplete={handleHealComplete}
+      />
     </div>
   )
 }
