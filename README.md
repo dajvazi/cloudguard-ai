@@ -37,6 +37,28 @@ cloudguard-ai/
 
 ## Getting Started
 
+You can run the stack **with Docker** (recommended for demos) or **locally** with two terminals.
+
+### Option A — Docker (all services)
+
+```bash
+# 1. Create env file from template
+cp .env.docker.example .env
+# Edit .env — set OpenAI__ApiKey and AWS credentials if needed
+
+# 2. Build and start postgres + backend + frontend
+docker compose up --build
+
+# 3. Open the app
+#    Dashboard:  http://localhost
+#    API/Swagger: http://localhost:8080/swagger
+```
+
+Stop: `docker compose down`  
+Reset database: `docker compose down -v`
+
+### Option B — Local development
+
 Open **two terminals**:
 
 ### 1. Database

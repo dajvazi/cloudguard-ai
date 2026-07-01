@@ -3,6 +3,7 @@ backend/bin/
 backend/obj/
 backend/samples.zip
 backend/.env
+.env
 *.user
 *.suo
 
