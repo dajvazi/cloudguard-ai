@@ -51,7 +51,7 @@ public class IncidentService(
         CancellationToken cancellationToken = default)
     {
         var service = await cloudServiceRepository.GetByIdAsync(request.CloudServiceId, cancellationToken)
-            ?? throw new ArgumentException($"Shërbimi me id {request.CloudServiceId} nuk u gjet.");
+            ?? throw new ArgumentException($"Service with id {request.CloudServiceId} was not found.");
 
         var incident = new Incident
         {
@@ -75,7 +75,7 @@ public class IncidentService(
         CancellationToken cancellationToken = default)
     {
         if (!ValidStatuses.Contains(status))
-            throw new ArgumentException($"Status i pavlefshëm: {status}");
+            throw new ArgumentException($"Invalid status: {status}");
 
         var incident = await incidentRepository.GetByIdWithServiceForUpdateAsync(id, cancellationToken);
         if (incident is null)

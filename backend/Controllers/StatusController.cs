@@ -11,7 +11,7 @@ public class StatusController : ControllerBase
     {
         return Ok(new
         {
-            message = "CloudGuard API është online!",
+            message = "CloudGuard API is online!",
             version = "1.0.0",
             timestamp = DateTime.UtcNow
         });

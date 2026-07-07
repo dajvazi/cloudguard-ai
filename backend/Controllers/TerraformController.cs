@@ -17,7 +17,7 @@ public class TerraformController(ITerraformUploadService uploadService) : Contro
         CancellationToken cancellationToken)
     {
         if (file is null)
-            return BadRequest(new { message = "Skedari mungon. Përdor form field 'file'." });
+            return BadRequest(new { message = "File is missing. Use form field 'file'." });
 
         try
         {
@@ -53,7 +53,7 @@ public class TerraformController(ITerraformUploadService uploadService) : Contro
         var upload = await uploadService.GetByIdAsync(id, cancellationToken);
 
         if (upload is null)
-            return NotFound(new { message = $"Upload me id {id} nuk u gjet." });
+            return NotFound(new { message = $"Upload with id {id} was not found." });
 
         return Ok(upload);
     }

@@ -45,7 +45,7 @@ public class RecoveryActionService(
         CancellationToken cancellationToken = default)
     {
         if (!await incidentRepository.ExistsAsync(request.IncidentId, cancellationToken))
-            throw new ArgumentException($"Incidenti me id {request.IncidentId} nuk u gjet.");
+            throw new ArgumentException($"Incident with id {request.IncidentId} was not found.");
 
         var action = new RecoveryAction
         {
@@ -68,7 +68,7 @@ public class RecoveryActionService(
         CancellationToken cancellationToken = default)
     {
         if (!ValidStatuses.Contains(actionStatus))
-            throw new ArgumentException($"Status i pavlefshëm: {actionStatus}");
+            throw new ArgumentException($"Invalid status: {actionStatus}");
 
         var action = await recoveryActionRepository.GetByIdForUpdateAsync(id, cancellationToken);
         if (action is null)

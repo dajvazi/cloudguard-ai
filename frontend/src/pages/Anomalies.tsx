@@ -32,7 +32,7 @@ export function Anomalies() {
     load()
   }
 
-  if (loading) return <div className="page-loading">Duke ngarkuar...</div>
+  if (loading) return <div className="page-loading">Loading...</div>
 
   return (
     <div className="anomalies-page">
@@ -45,7 +45,7 @@ export function Anomalies() {
           <span className="anomaly-total">{anomalies.length} detected</span>
           <DeleteAllButton
             label="Delete All"
-            confirmMessage="Fshi të gjitha anomalitë? Ky veprim nuk kthehet mbrapsht."
+            confirmMessage="Delete all anomalies? This action cannot be undone."
             onDelete={purgeAnomalies}
             onSuccess={() => load()}
           />

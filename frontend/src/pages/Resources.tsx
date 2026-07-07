@@ -39,20 +39,20 @@ export function Resources() {
     [resources, metricsByName],
   )
 
-  if (loading) return <div className="page-loading">Duke ngarkuar...</div>
+  if (loading) return <div className="page-loading">Loading...</div>
 
   return (
     <div className="resources-page">
       <header className="page-header">
         <div>
           <h1>Resources</h1>
-          <p>Infrastructure resources me metrikat e tyre</p>
+          <p>Infrastructure resources with their metrics</p>
         </div>
         <div className="page-header-actions">
           <span className="resource-count">{resources.length} total</span>
           <DeleteAllButton
             label="Delete All"
-            confirmMessage="Fshi të gjitha resources (Terraform inventory)? Ky veprim nuk kthehet mbrapsht."
+            confirmMessage="Delete all resources (Terraform inventory)? This action cannot be undone."
             onDelete={purgeResources}
             onSuccess={() => load()}
           />
@@ -93,7 +93,7 @@ export function Resources() {
 
       {withMetrics.length === 0 && resources.length > 0 && (
         <p className="resources-hint">
-          Metrikat shfaqen kur importon nga AWS CloudWatch. Terraform zbulon vetëm resources.
+          Metrics appear when you import from AWS CloudWatch. Terraform only discovers resources.
         </p>
       )}
     </div>

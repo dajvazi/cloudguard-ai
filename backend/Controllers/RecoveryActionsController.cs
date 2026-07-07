@@ -24,7 +24,7 @@ public class RecoveryActionsController(IRecoveryActionService recoveryActionServ
     {
         var action = await recoveryActionService.GetByIdAsync(id, cancellationToken);
         if (action is null)
-            return NotFound(new { message = $"Recovery action me id {id} nuk u gjet." });
+            return NotFound(new { message = $"Recovery action with id {id} was not found." });
 
         return Ok(action);
     }
@@ -70,7 +70,7 @@ public class RecoveryActionsController(IRecoveryActionService recoveryActionServ
         {
             var action = await recoveryActionService.UpdateStatusAsync(id, request.ActionStatus, cancellationToken);
             if (action is null)
-                return NotFound(new { message = $"Recovery action me id {id} nuk u gjet." });
+                return NotFound(new { message = $"Recovery action with id {id} was not found." });
 
             return Ok(action);
         }
@@ -87,7 +87,7 @@ public class RecoveryActionsController(IRecoveryActionService recoveryActionServ
     {
         var action = await recoveryActionService.ExecuteAsync(id, cancellationToken);
         if (action is null)
-            return NotFound(new { message = $"Recovery action me id {id} nuk u gjet." });
+            return NotFound(new { message = $"Recovery action with id {id} was not found." });
 
         return Ok(action);
     }

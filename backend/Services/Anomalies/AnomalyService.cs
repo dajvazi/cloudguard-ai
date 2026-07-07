@@ -36,7 +36,7 @@ public class AnomalyService(
         CancellationToken cancellationToken = default)
     {
         var service = await cloudServiceRepository.GetByIdAsync(request.CloudServiceId, cancellationToken)
-            ?? throw new ArgumentException($"Shërbimi me id {request.CloudServiceId} nuk u gjet.");
+            ?? throw new ArgumentException($"Service with id {request.CloudServiceId} was not found.");
 
         var anomaly = new Anomaly
         {

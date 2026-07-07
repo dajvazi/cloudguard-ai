@@ -22,7 +22,7 @@ public class TerraformArchiveExtractor : ITerraformArchiveExtractor
             return [new TerraformFileEntry(file.FileName, content)];
         }
 
-        throw new ArgumentException("Lejohen vetëm skedarë .tf ose .zip.");
+        throw new ArgumentException("Only .tf or .zip files are allowed.");
     }
 
     private static async Task<IReadOnlyList<TerraformFileEntry>> ExtractZipAsync(
@@ -47,7 +47,7 @@ public class TerraformArchiveExtractor : ITerraformArchiveExtractor
             }
 
             if (entries.Count >= MaxFilesInArchive)
-                throw new ArgumentException($"Arkiva nuk mund të ketë më shumë se {MaxFilesInArchive} skedarë .tf.");
+                throw new ArgumentException($"Archive cannot contain more than {MaxFilesInArchive} .tf files.");
 
             await using var entryStream = entry.Open();
             using var reader = new StreamReader(entryStream);
@@ -57,7 +57,7 @@ public class TerraformArchiveExtractor : ITerraformArchiveExtractor
         }
 
         if (entries.Count == 0)
-            throw new ArgumentException("Arkiva nuk përmban asnjë skedar .tf.");
+            throw new ArgumentException("Archive does not contain any .tf files.");
 
         return entries;
     }
@@ -65,10 +65,10 @@ public class TerraformArchiveExtractor : ITerraformArchiveExtractor
     private static void ValidateFile(IFormFile file)
     {
         if (file.Length == 0)
-            throw new ArgumentException("Skedari është bosh.");
+            throw new ArgumentException("File is empty.");
 
         if (file.Length > MaxFileSizeBytes)
-            throw new ArgumentException("Skedari nuk mund të jetë më i madh se 10 MB.");
+            throw new ArgumentException("File cannot be larger than 10 MB.");
     }
 
     private static async Task<string> ReadTextAsync(IFormFile file, CancellationToken cancellationToken)

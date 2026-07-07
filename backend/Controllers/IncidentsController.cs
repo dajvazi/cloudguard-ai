@@ -32,7 +32,7 @@ public class IncidentsController(IIncidentService incidentService) : ControllerB
     {
         var incident = await incidentService.GetByIdAsync(id, cancellationToken);
         if (incident is null)
-            return NotFound(new { message = $"Incidenti me id {id} nuk u gjet." });
+            return NotFound(new { message = $"Incident with id {id} was not found." });
 
         return Ok(incident);
     }
@@ -78,7 +78,7 @@ public class IncidentsController(IIncidentService incidentService) : ControllerB
         {
             var incident = await incidentService.UpdateStatusAsync(id, request.Status, cancellationToken);
             if (incident is null)
-                return NotFound(new { message = $"Incidenti me id {id} nuk u gjet." });
+                return NotFound(new { message = $"Incident with id {id} was not found." });
 
             return Ok(incident);
         }
@@ -95,7 +95,7 @@ public class IncidentsController(IIncidentService incidentService) : ControllerB
     {
         var incident = await incidentService.ResolveAsync(id, cancellationToken);
         if (incident is null)
-            return NotFound(new { message = $"Incidenti me id {id} nuk u gjet." });
+            return NotFound(new { message = $"Incident with id {id} was not found." });
 
         return Ok(incident);
     }

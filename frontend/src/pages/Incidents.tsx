@@ -32,7 +32,7 @@ export function Incidents() {
     load()
   }
 
-  if (loading) return <div className="page-loading">Duke ngarkuar...</div>
+  if (loading) return <div className="page-loading">Loading...</div>
 
   const active = incidents.filter((i) => i.status !== 'Resolved')
   const resolved = incidents.filter((i) => i.status === 'Resolved')
@@ -48,7 +48,7 @@ export function Incidents() {
           <span className="incidents-count">{active.length} active</span>
           <DeleteAllButton
             label="Delete All"
-            confirmMessage="Fshi të gjitha incidentet dhe recovery actions e lidhura? Ky veprim nuk kthehet mbrapsht."
+            confirmMessage="Delete all incidents and linked recovery actions? This action cannot be undone."
             onDelete={purgeIncidents}
             onSuccess={() => load()}
           />

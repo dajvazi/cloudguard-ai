@@ -24,7 +24,7 @@ public class AnomaliesController(IAnomalyService anomalyService) : ControllerBas
     {
         var anomaly = await anomalyService.GetByIdAsync(id, cancellationToken);
         if (anomaly is null)
-            return NotFound(new { message = $"Anomalia me id {id} nuk u gjet." });
+            return NotFound(new { message = $"Anomaly with id {id} was not found." });
 
         return Ok(anomaly);
     }

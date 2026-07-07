@@ -61,11 +61,11 @@ export function Services() {
     try {
       const result = await reevaluateAwsHealth()
       setEvalMessage(
-        `U krijuan ${result.incidentsCreated} incidente, ${result.anomaliesCreated} anomalí`
+        `Created ${result.incidentsCreated} incidents, ${result.anomaliesCreated} anomalies`
       )
       await load()
     } catch {
-      setEvalMessage('Vlerësimi dështoi')
+      setEvalMessage('Evaluation failed')
     }
     setEvaluating(false)
   }
@@ -82,14 +82,14 @@ export function Services() {
   const servicesWithMetrics = services.filter((s) => (metricsByService[s.id]?.length ?? 0) > 0)
   const servicesWithoutMetrics = services.filter((s) => (metricsByService[s.id]?.length ?? 0) === 0)
 
-  if (loading) return <div className="page-loading">Duke ngarkuar...</div>
+  if (loading) return <div className="page-loading">Loading...</div>
 
   return (
     <div className="services-page">
       <header className="page-header">
         <div>
           <h1>Cloud Services</h1>
-          <p>Monitorim i metrikave për çdo resource — CPU, Network, Disk, Status</p>
+          <p>Metric monitoring for each resource — CPU, Network, Disk, Status</p>
         </div>
         <div className="header-btns">
           <button className="upload-btn" onClick={() => setCloudOpen(true)}>
@@ -104,7 +104,7 @@ export function Services() {
       </header>
 
       <section className="delete-actions-bar">
-        <span className="delete-actions-label">Veprime:</span>
+        <span className="delete-actions-label">Actions:</span>
         <div className="delete-actions-group">
           <button
             type="button"
@@ -113,33 +113,33 @@ export function Services() {
             disabled={evaluating}
           >
             <RefreshCw size={14} className={evaluating ? 'spinner' : ''} />
-            Kontrollo Incidentet
+            Check Incidents
           </button>
           <DeleteAllButton
             label="Metrics"
             variant="compact"
-            confirmMessage="Fshi të gjitha metrikat?"
+            confirmMessage="Delete all metrics?"
             onDelete={purgeMetrics}
             onSuccess={() => load()}
           />
           <DeleteAllButton
             label="AWS"
             variant="compact"
-            confirmMessage="Fshi të gjitha AWS services dhe metrikat e tyre?"
+            confirmMessage="Delete all AWS services and their metrics?"
             onDelete={purgeAws}
             onSuccess={() => load()}
           />
           <DeleteAllButton
             label="Terraform"
             variant="compact"
-            confirmMessage="Fshi të gjitha të dhënat Terraform (uploads, services, resources)?"
+            confirmMessage="Delete all Terraform data (uploads, services, resources)?"
             onDelete={purgeTerraform}
             onSuccess={() => load()}
           />
           <DeleteAllButton
             label="All Services"
             variant="compact"
-            confirmMessage="Fshi TË GJITHA services, metrikat, anomalitë dhe incidentet? Ky veprim është shumë destruktiv."
+            confirmMessage="Delete ALL services, metrics, anomalies, and incidents? This action is highly destructive."
             onDelete={purgeServices}
             onSuccess={() => load()}
           />
@@ -261,7 +261,7 @@ export function Services() {
               </div>
               {svc.description && <p className="service-card-desc">{svc.description}</p>}
               <div className="metrics-panel-empty">
-                Nuk ka metrika — importo nga AWS CloudWatch
+                No metrics — import from AWS CloudWatch
               </div>
             </div>
           ))}

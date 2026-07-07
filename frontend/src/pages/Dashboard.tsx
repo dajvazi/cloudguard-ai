@@ -83,7 +83,7 @@ export function Dashboard() {
     : 0
 
   if (loading) {
-    return <div className="page-loading">Duke ngarkuar...</div>
+    return <div className="page-loading">Loading...</div>
   }
 
   return (

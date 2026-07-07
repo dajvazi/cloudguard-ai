@@ -34,7 +34,7 @@ export function Recovery() {
 
   useEffect(() => { load() }, [])
 
-  if (loading) return <div className="page-loading">Duke ngarkuar...</div>
+  if (loading) return <div className="page-loading">Loading...</div>
 
   return (
     <div className="recovery-page">
@@ -45,7 +45,7 @@ export function Recovery() {
         </div>
         <DeleteAllButton
           label="Delete All"
-          confirmMessage="Fshi të gjitha recovery actions? Ky veprim nuk kthehet mbrapsht."
+            confirmMessage="Delete all recovery actions? This action cannot be undone."
           onDelete={purgeRecoveryActions}
           onSuccess={() => load()}
         />

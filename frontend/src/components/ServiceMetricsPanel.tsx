@@ -167,7 +167,7 @@ interface ServiceMetricsPanelProps {
 
 export function ServiceMetricsPanel({ metrics, compact = false }: ServiceMetricsPanelProps) {
   if (metrics.length === 0) {
-    return <div className="metrics-panel-empty">Nuk ka metrika për këtë resource</div>
+    return <div className="metrics-panel-empty">No metrics for this resource</div>
   }
 
   const sorted = sortMetrics(metrics)
@@ -182,7 +182,7 @@ export function ServiceMetricsPanel({ metrics, compact = false }: ServiceMetrics
       </div>
 
       {compact && sorted.length > 6 && (
-        <div className="metrics-panel-more">+{sorted.length - 6} metrika të tjera — kliko për të gjitha</div>
+        <div className="metrics-panel-more">+{sorted.length - 6} more metrics — click to view all</div>
       )}
     </div>
   )

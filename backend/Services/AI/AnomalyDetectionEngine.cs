@@ -71,6 +71,36 @@ public class AnomalyDetectionEngine(
                 }
             }
 
+            CheckPeakThreshold(detectedAnomalies, service, metrics, "NetworkIn",
+                "High Network Traffic (In)", m => m.NetworkIn ?? m.Value, 100_000m, Severity.Warning);
+
+            CheckPeakThreshold(detectedAnomalies, service, metrics, "NetworkOut",
+                "High Network Traffic (Out)", m => m.NetworkOut ?? m.Value, 100_000m, Severity.Warning);
+
+            CheckPeakThreshold(detectedAnomalies, service, metrics, "NetworkPacketsIn",
+                "High Network Packet Rate", m => m.Value, 3_000m, Severity.Warning);
+
+            CheckPeakThreshold(detectedAnomalies, service, metrics, "DiskReadBytes",
+                "High Disk Read I/O", m => m.DiskReadBytes ?? m.Value, 50_000m, Severity.Warning);
+
+            CheckPeakThreshold(detectedAnomalies, service, metrics, "DiskWriteBytes",
+                "High Disk Write I/O", m => m.DiskWriteBytes ?? m.Value, 50_000m, Severity.Warning);
+
+            CheckPeakThreshold(detectedAnomalies, service, metrics, "EBSReadBytes",
+                "High Disk Read I/O", m => m.DiskReadBytes ?? m.Value, 50_000m, Severity.Warning);
+
+            CheckPeakThreshold(detectedAnomalies, service, metrics, "EBSWriteBytes",
+                "High Disk Write I/O", m => m.DiskWriteBytes ?? m.Value, 50_000m, Severity.Warning);
+
+            CheckPeakThreshold(detectedAnomalies, service, metrics, "MemoryUtilization",
+                "High Memory Usage", m => m.MemoryUsage ?? m.Value, 88m, Severity.Warning);
+
+            CheckPeakThreshold(detectedAnomalies, service, metrics, "AppLatency",
+                "Latency Spike", m => m.LatencyMs ?? m.Value, 500m, Severity.Critical);
+
+            CheckPeakThreshold(detectedAnomalies, service, metrics, "ErrorRate",
+                "Error Rate Surge", m => m.ErrorRate ?? m.Value, 5m, Severity.Critical);
+
             var latestMemory = LatestMetric(metrics, m => m.MemoryUsage.HasValue);
             var memoryHistory = HistoryFor(metrics, m => m.MemoryUsage.HasValue);
 
@@ -146,6 +176,29 @@ public class AnomalyDetectionEngine(
         Func<Metric, bool> predicate,
         Func<Metric, bool>? namePredicate = null) =>
         metrics.Where(m => predicate(m) && (namePredicate is null || namePredicate(m))).Skip(1).ToList();
+
+    private static void CheckPeakThreshold(
+        List<Anomaly> anomalies,
+        CloudService service,
+        List<Metric> metrics,
+        string metricName,
+        string anomalyType,
+        Func<Metric, decimal?> valueSelector,
+        decimal threshold,
+        string severity)
+    {
+        var matching = metrics
+            .Where(m => m.MetricName == metricName)
+            .Select(valueSelector)
+            .Where(v => v.HasValue)
+            .Select(v => v!.Value)
+            .ToList();
+
+        if (matching.Count == 0) return;
+
+        var peak = matching.Max();
+        CheckAbsoluteThreshold(anomalies, service, anomalyType, peak, threshold, severity);
+    }
 
     private static void CheckAbsoluteThreshold(
         List<Anomaly> anomalies,

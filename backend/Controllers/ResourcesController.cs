@@ -24,7 +24,7 @@ public class ResourcesController(IResourceService resourceService) : ControllerB
     {
         var resource = await resourceService.GetByIdAsync(id, cancellationToken);
         if (resource is null)
-            return NotFound(new { message = $"Resource me id {id} nuk u gjet." });
+            return NotFound(new { message = $"Resource with id {id} was not found." });
 
         return Ok(resource);
     }
@@ -36,7 +36,7 @@ public class ResourcesController(IResourceService resourceService) : ControllerB
         CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(source))
-            return BadRequest(new { message = "Parametri 'source' është i detyrueshëm." });
+            return BadRequest(new { message = "The 'source' parameter is required." });
 
         var resources = await resourceService.GetBySourceAsync(source, cancellationToken);
         return Ok(resources);

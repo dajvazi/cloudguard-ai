@@ -24,7 +24,7 @@ public class MetricsController(IMetricService metricService) : ControllerBase
     {
         var metric = await metricService.GetByIdAsync(id, cancellationToken);
         if (metric is null)
-            return NotFound(new { message = $"Metrika me id {id} nuk u gjet." });
+            return NotFound(new { message = $"Metric with id {id} was not found." });
 
         return Ok(metric);
     }

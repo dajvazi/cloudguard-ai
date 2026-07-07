@@ -27,7 +27,7 @@ public class CloudServicesController(ICloudServiceService cloudServiceService) :
         var service = await cloudServiceService.GetByIdAsync(id, cancellationToken);
 
         if (service is null)
-            return NotFound(new { message = $"Shërbimi me id {id} nuk u gjet." });
+            return NotFound(new { message = $"Service with id {id} was not found." });
 
         return Ok(service);
     }

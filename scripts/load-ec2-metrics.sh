@@ -67,12 +67,26 @@ for _ in {1..5}; do
   ' &
 done
 
-echo "[3/3] Disk write/read..."
+echo "[3/4] Disk write/read loop..."
 (
-  dd if=/dev/zero of=/tmp/cloudguard_loadtest bs=1M count=200 2>/dev/null
-  dd if=/tmp/cloudguard_loadtest of=/dev/null bs=1M 2>/dev/null
-  rm -f /tmp/cloudguard_loadtest
+  end=$((SECONDS + DURATION))
+  while [ "$SECONDS" -lt "$end" ]; do
+    dd if=/dev/zero of=/tmp/cloudguard_loadtest bs=1M count=50 2>/dev/null || true
+    dd if=/tmp/cloudguard_loadtest of=/dev/null bs=1M 2>/dev/null || true
+    sleep 2
+  done
+  rm -f /tmp/cloudguard_loadtest 2>/dev/null || true
 ) &
+
+echo "[4/4] Memory stress..."
+if command -v stress &>/dev/null; then
+  stress --vm 1 --vm-bytes 70% --timeout "$DURATION" &
+else
+  timeout "$DURATION" bash -c '
+    chunk="$(head -c 104857600 /dev/zero | tr "\0" "x")"
+    while true; do :; done
+  ' &
+fi
 
 echo ""
 echo "Ngarkesa aktive për ${DURATION}s (1 orë). Prit 2-5 min, pastaj Import Cloud → Last 1 hour."
