@@ -70,14 +70,20 @@ public class AwsCloudWatchService(
                 : new[] { request.Namespace };
 
             var endTime = DateTime.UtcNow;
-            var startTime = endTime.AddMinutes(-request.PeriodMinutes);
+            // "Now" (5 min) and other short windows need a slightly longer lookback
+            // so CloudWatch has at least one completed datapoint to return.
+            var lookbackMinutes = Math.Max(request.PeriodMinutes, 5);
+            var startTime = endTime.AddMinutes(-lookbackMinutes);
+            // Use 1-minute resolution for short windows so "Now" gets the latest points.
+            var metricPeriodSeconds = request.PeriodMinutes <= 15 ? 60 : 300;
             string? lastAwsError = null;
 
             foreach (var ns in namespaces)
             {
                 try
                 {
-                    await FetchNamespaceMetricsAsync(ns, startTime, endTime, metrics, discoveredServices, ct);
+                    await FetchNamespaceMetricsAsync(
+                        ns, startTime, endTime, metricPeriodSeconds, metrics, discoveredServices, ct);
                 }
                 catch (Exception ex)
                 {
@@ -145,6 +151,7 @@ public class AwsCloudWatchService(
         string ns,
         DateTime startTime,
         DateTime endTime,
+        int metricPeriodSeconds,
         List<AwsMetricDataDto> metrics,
         HashSet<string> discoveredServices,
         CancellationToken ct)
@@ -169,7 +176,7 @@ public class AwsCloudWatchService(
                 MetricStat = new MetricStat
                 {
                     Metric = metric,
-                    Period = 300,
+                    Period = metricPeriodSeconds,
                     Stat = "Average",
                 },
             });

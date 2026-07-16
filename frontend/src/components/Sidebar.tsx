@@ -26,7 +26,6 @@ export function Sidebar() {
         <Shield className="sidebar-logo" size={28} />
         <div>
           <h1 className="sidebar-title">CloudGuard</h1>
-          <span className="sidebar-subtitle">AIOps Platform</span>
         </div>
       </div>
 

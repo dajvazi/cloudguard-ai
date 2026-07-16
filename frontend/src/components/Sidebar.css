@@ -32,13 +32,6 @@
   line-height: 1.2;
 }
 
-.sidebar-subtitle {
-  font-size: 11px;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
 .sidebar-nav {
   flex: 1;
   display: flex;
