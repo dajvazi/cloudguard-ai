@@ -70,12 +70,14 @@ public class AwsCloudWatchService(
                 : new[] { request.Namespace };
 
             var endTime = DateTime.UtcNow;
-            // "Now" (5 min) and other short windows need a slightly longer lookback
-            // so CloudWatch has at least one completed datapoint to return.
-            var lookbackMinutes = Math.Max(request.PeriodMinutes, 5);
+            // Always pull 1-minute CloudWatch datapoints (requires EC2 detailed monitoring).
+            const int metricPeriodSeconds = 60;
+            // Short "Now" windows: look back a couple minutes so at least one completed
+            // 1-min datapoint is available (CloudWatch lags ~1 min).
+            var lookbackMinutes = request.PeriodMinutes <= 1
+                ? 2
+                : Math.Max(request.PeriodMinutes, 1);
             var startTime = endTime.AddMinutes(-lookbackMinutes);
-            // Use 1-minute resolution for short windows so "Now" gets the latest points.
-            var metricPeriodSeconds = request.PeriodMinutes <= 15 ? 60 : 300;
             string? lastAwsError = null;
 
             foreach (var ns in namespaces)

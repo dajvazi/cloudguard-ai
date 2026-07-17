@@ -6,6 +6,7 @@ import { SelfHealingBanner } from '../components/SelfHealingBanner'
 import { SelfHealingDialog } from '../components/SelfHealingDialog'
 import {
   fetchAnomalies,
+  fetchActiveIncidents,
   purgeAnomalies,
   type Anomaly,
   type SelfHealingResult,
@@ -15,13 +16,21 @@ import '../components/SelfHealingBanner.css'
 
 export function Anomalies() {
   const [anomalies, setAnomalies] = useState<Anomaly[]>([])
+  const [openServiceIds, setOpenServiceIds] = useState<Set<number>>(new Set())
   const [loading, setLoading] = useState(true)
   const [healDialogServiceId, setHealDialogServiceId] = useState<number | null>(null)
   const [healResult, setHealResult] = useState<SelfHealingResult | null>(null)
 
   function load() {
     setLoading(true)
-    fetchAnomalies().then(setAnomalies).catch(() => {}).finally(() => setLoading(false))
+    Promise.allSettled([fetchAnomalies(), fetchActiveIncidents()])
+      .then(([anom, incs]) => {
+        if (anom.status === 'fulfilled') setAnomalies(anom.value)
+        if (incs.status === 'fulfilled') {
+          setOpenServiceIds(new Set(incs.value.map((i) => i.cloudServiceId)))
+        }
+      })
+      .finally(() => setLoading(false))
   }
 
   useEffect(() => { load() }, [])
@@ -90,13 +99,15 @@ export function Anomalies() {
                     <span className="confidence-pct">{a.aiConfidence}%</span>
                   </div>
                 )}
-                <button
-                  type="button"
-                  className="btn-heal"
-                  onClick={() => setHealDialogServiceId(a.cloudServiceId)}
-                >
-                  <Sparkles size={13} /> Self-Heal
-                </button>
+                {openServiceIds.has(a.cloudServiceId) && (
+                  <button
+                    type="button"
+                    className="btn-heal"
+                    onClick={() => setHealDialogServiceId(a.cloudServiceId)}
+                  >
+                    <Sparkles size={13} /> Self-Heal
+                  </button>
+                )}
               </div>
             </div>
           ))}

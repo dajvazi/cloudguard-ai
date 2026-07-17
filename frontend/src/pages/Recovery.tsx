@@ -96,7 +96,9 @@ export function Recovery() {
                     <td className="rec-incident">INC-{a.incidentId}</td>
                     <td className="rec-type">{a.actionType || '—'}</td>
                     <td><StatusBadge status={a.actionStatus} size="sm" /></td>
-                    <td className="rec-desc">{a.description || '—'}</td>
+                    <td className="rec-desc">
+                      <div className="rec-desc-body">{a.description || '—'}</div>
+                    </td>
                     <td className="rec-time">{new Date(a.executedAt).toLocaleString()}</td>
                   </tr>
                 ))}

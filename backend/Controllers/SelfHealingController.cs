@@ -68,9 +68,10 @@ public class SelfHealingController(ISelfHealingOrchestrator orchestrator) : Cont
     public async Task<ActionResult<SelfHealingResult>> ExecuteRunbook(
         int serviceId,
         string runbookId,
+        [FromQuery] int? incidentId,
         CancellationToken cancellationToken)
     {
-        var result = await orchestrator.ExecuteRunbookAsync(serviceId, runbookId, cancellationToken);
+        var result = await orchestrator.ExecuteRunbookAsync(serviceId, runbookId, incidentId, cancellationToken);
         return ToResponse(result);
     }
 }

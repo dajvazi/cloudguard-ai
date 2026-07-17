@@ -9,7 +9,7 @@ public interface IAwsCloudWatchService
 public record AwsImportRequest(
     string Region,
     string? Namespace = null,
-    int PeriodMinutes = 60);
+    int PeriodMinutes = 1);
 
 public record AwsImportResult(
     bool Success,

@@ -81,6 +81,7 @@ export function Dashboard() {
   const healthyPercent = services.length > 0
     ? Math.round((healthyCount / services.length) * 100)
     : 0
+  const openServiceIds = new Set(incidents.map((i) => i.cloudServiceId))
 
   if (loading) {
     return <div className="page-loading">Loading...</div>
@@ -228,17 +229,19 @@ export function Dashboard() {
                     <span className="confidence-value">{a.aiConfidence}%</span>
                   </div>
                 )}
-                <button
-                  className="btn-heal"
-                  onClick={() => handleAutoHeal(a.id)}
-                  disabled={healingId !== null}
-                >
-                  {healingId === a.id ? (
-                    <><RefreshCw size={13} className="spinner" /> Healing...</>
-                  ) : (
-                    <><Sparkles size={13} /> Trigger Auto-Heal</>
-                  )}
-                </button>
+                {openServiceIds.has(a.cloudServiceId) && (
+                  <button
+                    className="btn-heal"
+                    onClick={() => handleAutoHeal(a.id)}
+                    disabled={healingId !== null}
+                  >
+                    {healingId === a.id ? (
+                      <><RefreshCw size={13} className="spinner" /> Healing...</>
+                    ) : (
+                      <><Sparkles size={13} /> Trigger Auto-Heal</>
+                    )}
+                  </button>
+                )}
               </div>
             ))}
           </div>

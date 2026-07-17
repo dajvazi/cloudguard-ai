@@ -49,6 +49,10 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 echo "[1/3] CPU stress ($CPU_CORES cores)..."
+if ! command -v stress &>/dev/null; then
+  echo "Installing stress..."
+  sudo apt-get update -qq && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq stress || true
+fi
 if command -v stress &>/dev/null; then
   stress --cpu "$CPU_CORES" --timeout "$DURATION" &
 else
@@ -80,7 +84,9 @@ echo "[3/4] Disk write/read loop..."
 
 echo "[4/4] Memory stress..."
 if command -v stress &>/dev/null; then
-  stress --vm 1 --vm-bytes 70% --timeout "$DURATION" &
+  # ~70% of total RAM in MB (stress does not accept % suffix)
+  vm_mb=$(awk '/MemTotal/ {printf "%d", $2*0.7/1024}' /proc/meminfo)
+  stress --vm 1 --vm-bytes "${vm_mb}M" --timeout "$DURATION" &
 else
   timeout "$DURATION" bash -c '
     chunk="$(head -c 104857600 /dev/zero | tr "\0" "x")"

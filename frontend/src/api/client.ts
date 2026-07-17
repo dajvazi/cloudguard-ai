@@ -174,8 +174,13 @@ export function analyzeForHealing(serviceId: number): Promise<HealingAnalysis> {
   return getJson<HealingAnalysis>(`/api/self-healing/analyze/${serviceId}`)
 }
 
-export function executeRunbook(serviceId: number, runbookId: string): Promise<SelfHealingResult> {
-  return postSelfHealing(`/api/self-healing/execute/${serviceId}/${runbookId}`)
+export function executeRunbook(
+  serviceId: number,
+  runbookId: string,
+  incidentId?: number | null,
+): Promise<SelfHealingResult> {
+  const qs = incidentId != null ? `?incidentId=${incidentId}` : ''
+  return postSelfHealing(`/api/self-healing/execute/${serviceId}/${runbookId}${qs}`)
 }
 
 // AWS CloudWatch
@@ -229,7 +234,7 @@ export function reevaluateAwsHealth(): Promise<{ anomaliesCreated: number; incid
     })
 }
 
-export async function importAwsCloudWatch(region: string, namespace?: string, periodMinutes = 60): Promise<AwsImportResult> {
+export async function importAwsCloudWatch(region: string, namespace?: string, periodMinutes = 1): Promise<AwsImportResult> {
   const response = await fetch('/api/aws/import', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

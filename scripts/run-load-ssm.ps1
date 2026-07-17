@@ -33,6 +33,9 @@ if ($state -eq "stopped") {
     Start-Sleep -Seconds 45
 }
 
+Write-Host "Enabling detailed monitoring (1-min metrics)..."
+& $aws ec2 monitor-instances --instance-ids $InstanceId --region $Region | Out-Null
+
 # 3. Base64-encode load-ec2-metrics.sh so no shell escaping issues occur
 $loadScriptPath = Join-Path $PSScriptRoot "load-ec2-metrics.sh"
 $raw = [System.IO.File]::ReadAllText($loadScriptPath)
@@ -59,6 +62,8 @@ $paramsFile = Join-Path $env:TEMP "ssm-load-params.json"
 $paramUri = "file://" + ($paramsFile -replace '\\', '/')
 
 # 5. Send the command
+$env:PYTHONIOENCODING = "utf-8"
+$env:PYTHONUTF8 = "1"
 $send = & $aws ssm send-command `
     --instance-ids $InstanceId `
     --document-name "AWS-RunShellScript" `
@@ -70,16 +75,23 @@ Remove-Item $paramsFile -ErrorAction SilentlyContinue
 
 $commandId = $send.Command.CommandId
 Write-Host "SSM CommandId: $commandId"
-Write-Host "Waiting for result..."
+Write-Host "Waiting for SSM..."
 
-Start-Sleep -Seconds 12
-$result = & $aws ssm get-command-invocation `
-    --command-id $commandId `
-    --instance-id $InstanceId `
-    --region $Region `
-    --output json | ConvertFrom-Json
+$status = "Pending"
+for ($i = 0; $i -lt 20; $i++) {
+    Start-Sleep -Seconds 2
+    $result = & $aws ssm get-command-invocation `
+        --command-id $commandId `
+        --instance-id $InstanceId `
+        --region $Region `
+        --output json | ConvertFrom-Json
+    $status = $result.Status
+    if ($status -eq "Success" -or $status -eq "Failed" -or $status -eq "Cancelled" -or $status -eq "TimedOut") {
+        break
+    }
+}
 
-Write-Host "Status: $($result.Status)"
+Write-Host "Status: $status"
 Write-Host "--- Output ---"
 Write-Host $result.StandardOutputContent
 if ($result.StandardErrorContent) {
@@ -89,4 +101,38 @@ if ($result.StandardErrorContent) {
 
 Write-Host ""
 Write-Host "CPU load running for $DurationSeconds s on $CpuCores cores."
-Write-Host "Wait 2-5 min, then in CloudGuard UI: Import Cloud -> Last 1 hour -> Import"
+Write-Host "Polling CloudWatch CPU (max 90s)..."
+$ready = $false
+$deadline = [DateTime]::UtcNow.AddSeconds(90)
+while ([DateTime]::UtcNow -lt $deadline) {
+    Start-Sleep -Seconds 15
+    $end = [DateTime]::UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ")
+    $start = [DateTime]::UtcNow.AddMinutes(-5).ToString("yyyy-MM-ddTHH:mm:ssZ")
+    $cpu = & $aws cloudwatch get-metric-statistics `
+        --namespace AWS/EC2 `
+        --metric-name CPUUtilization `
+        --dimensions "Name=InstanceId,Value=$InstanceId" `
+        --start-time $start `
+        --end-time $end `
+        --period 60 `
+        --statistics Average `
+        --region $Region `
+        --query "Datapoints | max_by(@, &Timestamp).Average" `
+        --output text 2>$null
+
+    if ($cpu -and $cpu -ne "None" -and [double]$cpu -ge 40) {
+        Write-Host ("CPU ready: {0:N1}%" -f [double]$cpu)
+        $ready = $true
+        break
+    }
+
+    $shown = if ($cpu -and $cpu -ne "None") { ("{0:N1}%" -f [double]$cpu) } else { "no datapoint yet" }
+    Write-Host "  still waiting... ($shown)"
+}
+
+Write-Host ""
+if ($ready) {
+    Write-Host "Ready now. CloudGuard UI -> Import Cloud -> Now (last 5 minutes) -> Import"
+} else {
+    Write-Host "Load is running. Try Import Cloud -> Now in about 1 minute."
+}

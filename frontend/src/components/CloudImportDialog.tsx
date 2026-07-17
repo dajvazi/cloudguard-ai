@@ -43,7 +43,7 @@ const NAMESPACES = [
 export function CloudImportDialog({ open, onClose, onSuccess }: CloudImportDialogProps) {
   const [region, setRegion] = useState('us-east-1')
   const [namespace, setNamespace] = useState('')
-  const [period, setPeriod] = useState(60)
+  const [period, setPeriod] = useState(1)
   const [connectionStatus, setConnectionStatus] = useState<'idle' | 'testing' | 'connected' | 'failed'>('idle')
   const [importing, setImporting] = useState(false)
   const [progress, setProgress] = useState(0)
@@ -171,7 +171,8 @@ export function CloudImportDialog({ open, onClose, onSuccess }: CloudImportDialo
               <div className="form-field">
                 <label>Time Period</label>
                 <select value={period} onChange={(e) => setPeriod(Number(e.target.value))}>
-                  <option value={5}>Now (last 5 minutes)</option>
+                  <option value={1}>Now (last 1 minute)</option>
+                  <option value={5}>Last 5 minutes</option>
                   <option value={15}>Last 15 minutes</option>
                   <option value={30}>Last 30 minutes</option>
                   <option value={60}>Last 1 hour</option>

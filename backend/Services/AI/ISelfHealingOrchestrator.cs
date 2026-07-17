@@ -8,7 +8,11 @@ public interface ISelfHealingOrchestrator
     Task<SelfHealingResult> TriggerFromAnomalyAsync(int anomalyId, CancellationToken cancellationToken = default);
     Task<SelfHealingResult> TriggerFromIncidentAsync(int incidentId, CancellationToken cancellationToken = default);
     Task<HealingAnalysis> AnalyzeAsync(int serviceId, CancellationToken cancellationToken = default);
-    Task<SelfHealingResult> ExecuteRunbookAsync(int serviceId, string runbookId, CancellationToken cancellationToken = default);
+    Task<SelfHealingResult> ExecuteRunbookAsync(
+        int serviceId,
+        string runbookId,
+        int? incidentId = null,
+        CancellationToken cancellationToken = default);
 }
 
 public record SelfHealingResult(

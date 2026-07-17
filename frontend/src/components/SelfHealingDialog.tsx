@@ -21,11 +21,18 @@ import './SelfHealingDialog.css'
 interface SelfHealingDialogProps {
   open: boolean
   serviceId: number | null
+  incidentId?: number | null
   onClose: () => void
   onComplete: (result: SelfHealingResult) => void
 }
 
-export function SelfHealingDialog({ open, serviceId, onClose, onComplete }: SelfHealingDialogProps) {
+export function SelfHealingDialog({
+  open,
+  serviceId,
+  incidentId = null,
+  onClose,
+  onComplete,
+}: SelfHealingDialogProps) {
   const [analysis, setAnalysis] = useState<HealingAnalysis | null>(null)
   const [loading, setLoading] = useState(false)
   const [executing, setExecuting] = useState(false)
@@ -47,14 +54,19 @@ export function SelfHealingDialog({ open, serviceId, onClose, onComplete }: Self
       })
       .catch(() => setError('Failed to analyze service'))
       .finally(() => setLoading(false))
-  }, [open, serviceId])
+  }, [open, serviceId, incidentId])
 
   async function handleExecute() {
     if (!serviceId || !selectedId) return
     setExecuting(true)
     setError(null)
     try {
-      const result = await executeRunbook(serviceId, selectedId)
+      const result = await executeRunbook(serviceId, selectedId, incidentId)
+      if (!result.success) {
+        setError(result.message || 'Execution failed')
+        setExecuting(false)
+        return
+      }
       onComplete(result)
     } catch {
       setError('Execution failed')
@@ -100,7 +112,7 @@ export function SelfHealingDialog({ open, serviceId, onClose, onComplete }: Self
           {analysis && !analysis.success && (
             <div className="heal-error">
               <AlertTriangle size={16} />
-              <span>No anomalies found for this service. Nothing to heal.</span>
+              <span>No open incident to heal — already resolved or nothing pending.</span>
             </div>
           )}
 

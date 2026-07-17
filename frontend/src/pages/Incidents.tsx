@@ -16,7 +16,7 @@ import '../components/SelfHealingBanner.css'
 export function Incidents() {
   const [incidents, setIncidents] = useState<Incident[]>([])
   const [loading, setLoading] = useState(true)
-  const [healDialogServiceId, setHealDialogServiceId] = useState<number | null>(null)
+  const [healTarget, setHealTarget] = useState<{ serviceId: number; incidentId: number } | null>(null)
   const [healResult, setHealResult] = useState<SelfHealingResult | null>(null)
 
   const load = useCallback(async () => {
@@ -27,7 +27,7 @@ export function Incidents() {
   useEffect(() => { load() }, [load])
 
   function handleHealComplete(result: SelfHealingResult) {
-    setHealDialogServiceId(null)
+    setHealTarget(null)
     setHealResult(result)
     load()
   }
@@ -91,7 +91,10 @@ export function Incidents() {
                   <td>
                     <button
                       className="btn-heal-sm"
-                      onClick={() => setHealDialogServiceId(inc.cloudServiceId)}
+                      onClick={() => setHealTarget({
+                        serviceId: inc.cloudServiceId,
+                        incidentId: inc.id,
+                      })}
                     >
                       <Sparkles size={12} />
                       <span>Self-Heal</span>
@@ -107,7 +110,7 @@ export function Incidents() {
                   <td><StatusBadge status={inc.status} size="sm" /></td>
                   <td className="inc-cause">{inc.rootCause || '—'}</td>
                   <td className="inc-time">{formatTime(inc.createdAt)}</td>
-                  <td className="inc-resolved-action">—</td>
+                  <td className="inc-resolved-action">Resolved</td>
                 </tr>
               ))}
             </tbody>
@@ -116,9 +119,10 @@ export function Incidents() {
       )}
 
       <SelfHealingDialog
-        open={healDialogServiceId !== null}
-        serviceId={healDialogServiceId}
-        onClose={() => setHealDialogServiceId(null)}
+        open={healTarget !== null}
+        serviceId={healTarget?.serviceId ?? null}
+        incidentId={healTarget?.incidentId ?? null}
+        onClose={() => setHealTarget(null)}
         onComplete={handleHealComplete}
       />
     </div>

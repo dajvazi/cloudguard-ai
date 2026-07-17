@@ -129,10 +129,19 @@
 .rec-desc {
   color: var(--text-secondary);
   font-size: 12px;
-  max-width: 250px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  max-width: 520px;
+  min-width: 280px;
+  vertical-align: top;
+}
+
+.rec-desc-body {
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.45;
+  max-height: 220px;
+  overflow-y: auto;
+  font-family: var(--font-mono);
+  font-size: 11px;
 }
 
 .rec-time {
