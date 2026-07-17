@@ -14,8 +14,8 @@
 # 3) Në EC2, ekzekuto:
 #    sed -i 's/\r$//' load-ec2-metrics.sh   # vetëm nëse merr bash\r error
 #    chmod +x load-ec2-metrics.sh
-#    ./load-ec2-metrics.sh           # të gjitha vCPU-të, 1 orë
-#    ./load-ec2-metrics.sh 8 1800    # 8 CPU, 30 min
+#    ./load-ec2-metrics.sh           # të gjitha vCPU-të, 5 orë
+#    ./load-ec2-metrics.sh 2 1800    # 2 CPU, 30 min
 #
 # 4) Pas 2-5 min në CloudGuard UI: Import Cloud → Last 1 hour → Import
 #
@@ -32,7 +32,7 @@ default_cpu_cores() {
 }
 
 CPU_CORES="${1:-$(default_cpu_cores)}"
-DURATION="${2:-3600}"
+DURATION="${2:-18000}"
 
 echo "=== CloudGuard load test ==="
 echo "CPU cores: $CPU_CORES | Duration: ${DURATION}s"
@@ -95,5 +95,5 @@ else
 fi
 
 echo ""
-echo "Ngarkesa aktive për ${DURATION}s (1 orë). Prit 2-5 min, pastaj Import Cloud → Last 1 hour."
+echo "Ngarkesa aktive për ${DURATION}s (5 orë). Prit 1-2 min, pastaj Import Cloud → Now."
 wait

@@ -2,7 +2,7 @@
 param(
     [string]$InstanceId = "i-096014610bc8fdd16",
     [int]$CpuCores = 2,
-    [int]$DurationSeconds = 1800,
+    [int]$DurationSeconds = 18000,
     [string]$Region = "us-east-1"
 )
 
